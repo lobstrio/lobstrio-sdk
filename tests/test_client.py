@@ -4,15 +4,16 @@ from lobstrio import LobstrClient
 from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
 
 
-def test_client_from_env_missing(monkeypatch):
+def test_client_no_token_raises(monkeypatch, tmp_path):
     monkeypatch.delenv("LOBSTR_TOKEN", raising=False)
-    with pytest.raises(ValueError, match="LOBSTR_TOKEN"):
-        LobstrClient.from_env()
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))  # empty config dir
+    with pytest.raises(ValueError, match="No API token"):
+        LobstrClient()
 
 
 def test_client_from_env(monkeypatch, httpx_mock):
     monkeypatch.setenv("LOBSTR_TOKEN", "env-token")
-    client = LobstrClient.from_env()
+    client = LobstrClient()
     assert client is not None
     client.close()
 

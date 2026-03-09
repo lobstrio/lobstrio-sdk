@@ -7,7 +7,7 @@ from typing import Any, AsyncIterator, Callable
 
 import httpx
 
-from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status
+from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
 from lobstrio.models.crawler import Crawler, CrawlerParams
 from lobstrio.models.run import Run, RunStats
 from lobstrio.models.squid import Squid
@@ -25,10 +25,16 @@ class _AsyncHTTPClient:
             timeout=timeout,
         )
 
+    @staticmethod
+    def _parse_json(resp: httpx.Response) -> Any:
+        if not resp.content:
+            return {}
+        return resp.json()
+
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         resp = await self._client.get(path, params=params)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     async def post(
         self,
@@ -40,12 +46,12 @@ class _AsyncHTTPClient:
     ) -> Any:
         resp = await self._client.post(path, json=json, data=data, files=files, params=params)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     async def delete(self, path: str) -> Any:
         resp = await self._client.delete(path)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     async def download(self, url: str, dest: str) -> None:
         """Download from a full URL to a file path."""
@@ -194,8 +200,8 @@ class AsyncSquidsResource:
             body["export_unique_results"] = export_unique_results
         if params is not None:
             body["params"] = params
-        data = await self._http.post(f"/squids/{squid_id}", json=body)
-        return Squid.from_api(data)
+        await self._http.post(f"/squids/{squid_id}", json=body)
+        return await self.get(squid_id)
 
     async def empty(self, squid_id: str, *, type: str = "url") -> dict[str, Any]:
         return await self._http.post(f"/squids/{squid_id}/empty", json={"type": type})
@@ -340,24 +346,22 @@ class AsyncLobstrClient:
 
     def __init__(
         self,
-        token: str,
+        token: str | None = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
-        self._http = _AsyncHTTPClient(token, base_url, timeout)
+        resolved = token or _resolve_token()
+        if not resolved:
+            raise ValueError(
+                "No API token found. Pass token= explicitly, set LOBSTR_TOKEN env var, "
+                "or run 'lobstr config set-token' to save one."
+            )
+        self._http = _AsyncHTTPClient(resolved, base_url, timeout)
         self.crawlers = AsyncCrawlersResource(self._http)
         self.squids = AsyncSquidsResource(self._http)
         self.tasks = AsyncTasksResource(self._http)
         self.runs = AsyncRunsResource(self._http)
         self.results = AsyncResultsResource(self._http)
-
-    @classmethod
-    def from_env(cls, **kwargs: Any) -> AsyncLobstrClient:
-        """Create client using LOBSTR_TOKEN environment variable."""
-        token = os.environ.get("LOBSTR_TOKEN")
-        if not token:
-            raise ValueError("LOBSTR_TOKEN environment variable is not set")
-        return cls(token=token, **kwargs)
 
     async def me(self) -> User:
         data = await self._http.get("/me")

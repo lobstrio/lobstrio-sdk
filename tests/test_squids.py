@@ -36,6 +36,8 @@ def test_squids_create(client, httpx_mock):
 
 def test_squids_update(client, httpx_mock):
     updated = {**SQUID_DATA, "concurrency": 5}
+    # First response is for the POST (update), second for GET (re-fetch)
+    httpx_mock.add_response(json={"name": "My Scraper"})
     httpx_mock.add_response(json=updated)
     s = client.squids.update("sq1", concurrency=5)
     assert s.concurrency == 5

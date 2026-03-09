@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import httpx
 
-from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status
+from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
 from lobstrio.models.crawler import Crawler, CrawlerParams
 from lobstrio.models.run import Run, RunStats
 from lobstrio.models.squid import Squid
@@ -26,10 +26,17 @@ class _HTTPClient:
             timeout=timeout,
         )
 
+    @staticmethod
+    def _parse_json(resp: httpx.Response) -> Any:
+        """Parse JSON, returning {} for empty responses."""
+        if not resp.content:
+            return {}
+        return resp.json()
+
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         resp = self._client.get(path, params=params)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     def post(
         self,
@@ -41,12 +48,12 @@ class _HTTPClient:
     ) -> Any:
         resp = self._client.post(path, json=json, data=data, files=files, params=params)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     def delete(self, path: str) -> Any:
         resp = self._client.delete(path)
         _raise_for_status(resp)
-        return resp.json()
+        return self._parse_json(resp)
 
     def download(self, url: str, dest: str) -> None:
         """Download from a full URL (e.g. S3 signed URL) to a file path."""
@@ -147,8 +154,8 @@ class SquidsResource:
             body["export_unique_results"] = export_unique_results
         if params is not None:
             body["params"] = params
-        data = self._http.post(f"/squids/{squid_id}", json=body)
-        return Squid.from_api(data)
+        self._http.post(f"/squids/{squid_id}", json=body)
+        return self.get(squid_id)
 
     def empty(self, squid_id: str, *, type: str = "url") -> dict[str, Any]:
         """Remove all tasks from a squid."""
@@ -319,24 +326,22 @@ class LobstrClient:
 
     def __init__(
         self,
-        token: str,
+        token: str | None = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
-        self._http = _HTTPClient(token, base_url, timeout)
+        resolved = token or _resolve_token()
+        if not resolved:
+            raise ValueError(
+                "No API token found. Pass token= explicitly, set LOBSTR_TOKEN env var, "
+                "or run 'lobstr config set-token' to save one."
+            )
+        self._http = _HTTPClient(resolved, base_url, timeout)
         self.crawlers = CrawlersResource(self._http)
         self.squids = SquidsResource(self._http)
         self.tasks = TasksResource(self._http)
         self.runs = RunsResource(self._http)
         self.results = ResultsResource(self._http)
-
-    @classmethod
-    def from_env(cls, **kwargs: Any) -> LobstrClient:
-        """Create client using LOBSTR_TOKEN environment variable."""
-        token = os.environ.get("LOBSTR_TOKEN")
-        if not token:
-            raise ValueError("LOBSTR_TOKEN environment variable is not set")
-        return cls(token=token, **kwargs)
 
     def me(self) -> User:
         """Get current user profile."""

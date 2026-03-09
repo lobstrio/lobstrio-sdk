@@ -1,11 +1,42 @@
 from __future__ import annotations
 
+import os
+import sys
+from pathlib import Path
+
 import httpx
 
 from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
 
 DEFAULT_BASE_URL = "https://api.lobstr.io/v1/"
 DEFAULT_TIMEOUT = 30.0
+
+
+def _get_config_path() -> Path:
+    """Get the lobstr config file path (matches lobstrio-cli)."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "lobstr" / "config.toml"
+
+
+def _resolve_token() -> str | None:
+    """Resolve API token: LOBSTR_TOKEN env var -> config file."""
+    env = os.environ.get("LOBSTR_TOKEN")
+    if env:
+        return env
+    path = _get_config_path()
+    if not path.exists():
+        return None
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            import tomli as tomllib  # type: ignore[no-redef]
+    with open(path, "rb") as f:
+        cfg = tomllib.load(f)
+    return cfg.get("auth", {}).get("token")
 
 
 def _extract_error_message(body: dict, fallback: str) -> str:
