@@ -8,7 +8,15 @@ from typing import Any, Callable
 import httpx
 
 from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
+from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerParams
+from lobstrio.models.delivery import (
+    EmailDelivery,
+    GoogleSheetDelivery,
+    S3Delivery,
+    SFTPDelivery,
+    WebhookDelivery,
+)
 from lobstrio.models.run import Run, RunStats
 from lobstrio.models.squid import Squid
 from lobstrio.models.task import AddTasksResult, Task, UploadStatus
@@ -316,6 +324,233 @@ class ResultsResource:
         )
 
 
+class AccountsResource:
+    """Operations on /accounts endpoints."""
+
+    def __init__(self, http: _HTTPClient) -> None:
+        self._http = http
+
+    def list(self) -> list[Account]:
+        """List all connected platform accounts."""
+        data = self._http.get("/accounts")
+        items = data.get("data", data) if isinstance(data, dict) else data
+        return [Account.from_api(a) for a in items]
+
+    def get(self, account_id: str) -> Account:
+        """Get account details."""
+        data = self._http.get(f"/accounts/{account_id}")
+        # API may return {"data": [...]} even for single item
+        if isinstance(data, dict) and "data" in data:
+            items = data["data"]
+            if isinstance(items, list) and items:
+                return Account.from_api(items[0])
+        return Account.from_api(data)
+
+    def types(self) -> list[AccountType]:
+        """List available account types."""
+        data = self._http.get("/account_types")
+        items = data.get("data", data) if isinstance(data, dict) else data
+        return [AccountType.from_api(t) for t in items]
+
+    def sync(
+        self,
+        type: str,
+        cookies: dict[str, str],
+        *,
+        account: str | None = None,
+    ) -> dict[str, Any]:
+        """Sync (create or refresh) an account with cookies."""
+        body: dict[str, Any] = {"type": type, "cookies": cookies}
+        if account is not None:
+            body["account"] = account
+        return self._http.post("/accounts/cookies", json=body)
+
+    def sync_status(self, sync_id: str) -> SyncStatus:
+        """Check status of an account synchronization."""
+        data = self._http.get(f"/synchronize/{sync_id}")
+        return SyncStatus.from_api(data)
+
+    def update(
+        self,
+        account_id: str,
+        *,
+        type: str,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update account limits/params."""
+        return self._http.post("/accounts", json={
+            "account": account_id,
+            "type": type,
+            "params": params,
+        })
+
+    def delete(self, account_id: str) -> dict[str, Any]:
+        """Delete an account."""
+        return self._http.delete(f"/accounts/{account_id}")
+
+
+class DeliveryResource:
+    """Operations on /delivery endpoints."""
+
+    def __init__(self, http: _HTTPClient) -> None:
+        self._http = http
+
+    def email(
+        self,
+        squid: str,
+        *,
+        email: str,
+        notifications: bool = True,
+    ) -> EmailDelivery:
+        """Configure email delivery for a squid."""
+        data = self._http.post(
+            "/delivery",
+            json={"email": email, "notifications": notifications},
+            params={"squid": squid},
+        )
+        return EmailDelivery.from_api(data)
+
+    def google_sheet(
+        self,
+        squid: str,
+        *,
+        url: str,
+        append: bool = False,
+        is_active: bool = True,
+    ) -> GoogleSheetDelivery:
+        """Configure Google Sheets delivery for a squid."""
+        data = self._http.post(
+            "/delivery",
+            json={"google_sheet_fields": {"url": url, "append": append, "is_active": is_active}},
+            params={"squid": squid},
+        )
+        return GoogleSheetDelivery.from_api(data)
+
+    def s3(
+        self,
+        squid: str,
+        *,
+        bucket: str,
+        target_path: str,
+        aws_access_key: str | None = None,
+        aws_secret_key: str | None = None,
+        is_active: bool = True,
+    ) -> S3Delivery:
+        """Configure S3 delivery for a squid."""
+        fields: dict[str, Any] = {"bucket": bucket, "target_path": target_path, "is_active": is_active}
+        if aws_access_key is not None:
+            fields["aws_access_key"] = aws_access_key
+        if aws_secret_key is not None:
+            fields["aws_secret_key"] = aws_secret_key
+        data = self._http.post(
+            "/delivery",
+            json={"s3_fields": fields},
+            params={"squid": squid},
+        )
+        return S3Delivery.from_api(data)
+
+    def webhook(
+        self,
+        squid: str,
+        *,
+        url: str,
+        is_active: bool = True,
+        retry: bool = True,
+        on_running: bool = False,
+        on_paused: bool = False,
+        on_done: bool = True,
+        on_error: bool = True,
+    ) -> WebhookDelivery:
+        """Configure webhook delivery for a squid."""
+        data = self._http.post(
+            "/delivery",
+            json={"webhook_fields": {
+                "url": url,
+                "is_active": is_active,
+                "retry": retry,
+                "events": {
+                    "run.running": on_running,
+                    "run.paused": on_paused,
+                    "run.done": on_done,
+                    "run.error": on_error,
+                },
+            }},
+            params={"squid": squid},
+        )
+        return WebhookDelivery.from_api(data)
+
+    def sftp(
+        self,
+        squid: str,
+        *,
+        host: str,
+        port: int = 22,
+        username: str,
+        password: str,
+        directory: str,
+        is_active: bool = True,
+    ) -> SFTPDelivery:
+        """Configure SFTP delivery for a squid."""
+        data = self._http.post(
+            "/delivery",
+            json={"ftp_fields": {
+                "host": host,
+                "port": port,
+                "username": username,
+                "password": password,
+                "directory": directory,
+                "is_active": is_active,
+            }},
+            params={"squid": squid},
+        )
+        return SFTPDelivery.from_api(data)
+
+    def test_email(self, *, email: str) -> dict[str, Any]:
+        """Test email delivery configuration."""
+        return self._http.post("/delivery/test-email", json={"email": email})
+
+    def test_google_sheet(self, *, url: str) -> dict[str, Any]:
+        """Test Google Sheets delivery configuration."""
+        return self._http.post("/delivery/test-googlesheet", json={"url": url})
+
+    def test_s3(
+        self,
+        *,
+        bucket: str,
+        aws_access_key: str | None = None,
+        aws_secret_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Test S3 delivery configuration."""
+        body: dict[str, Any] = {"bucket": bucket}
+        if aws_access_key is not None:
+            body["aws_access_key"] = aws_access_key
+        if aws_secret_key is not None:
+            body["aws_secret_key"] = aws_secret_key
+        return self._http.post("/delivery/test-s3", json=body)
+
+    def test_webhook(self, *, url: str) -> dict[str, Any]:
+        """Test webhook delivery configuration."""
+        return self._http.post("/delivery/test-webhook", json={"url": url})
+
+    def test_sftp(
+        self,
+        *,
+        host: str,
+        port: int = 22,
+        username: str,
+        password: str,
+        directory: str,
+    ) -> dict[str, Any]:
+        """Test SFTP delivery configuration."""
+        return self._http.post("/delivery/test-sftp", json={
+            "host": host,
+            "port": port,
+            "username": username,
+            "password": password,
+            "directory": directory,
+        })
+
+
 # ---------------------------------------------------------------------------
 # Main client
 # ---------------------------------------------------------------------------
@@ -342,6 +577,8 @@ class LobstrClient:
         self.tasks = TasksResource(self._http)
         self.runs = RunsResource(self._http)
         self.results = ResultsResource(self._http)
+        self.accounts = AccountsResource(self._http)
+        self.delivery = DeliveryResource(self._http)
 
     def me(self) -> User:
         """Get current user profile."""

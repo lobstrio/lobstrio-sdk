@@ -92,5 +92,5 @@ class UploadStatus:
     def from_api(cls, data: dict[str, Any]) -> UploadStatus:
         return cls(
             state=data.get("state", ""),
-            meta=UploadMeta.from_api(data.get("meta", {})),
+            meta=UploadMeta.from_api(data.get("meta") or {}),
         )

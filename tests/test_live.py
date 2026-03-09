@@ -5,14 +5,20 @@ Run with: pytest tests/test_live.py -v -s
 Requires a valid token in ~/.config/lobstr/config.toml or LOBSTR_TOKEN env var.
 """
 
+import os
+import tempfile
+
 import pytest
 
 from lobstrio import (
+    Account,
+    AccountType,
     AsyncLobstrClient,
     Crawler,
     CrawlerParams,
     LobstrClient,
     Run,
+    RunStats,
     Squid,
     Task,
 )
@@ -26,6 +32,11 @@ except ValueError:
     HAS_TOKEN = False
 
 pytestmark = pytest.mark.skipif(not HAS_TOKEN, reason="No API token available")
+
+# Google Maps crawler ID (first crawler, well-known)
+MAPS_CRAWLER_ID = "4734d096159ef05210e0e1677e8be823"
+MAPS_URL_1 = "https://www.google.com/maps/place/Eiffel+Tower/@48.8583701,2.2944813"
+MAPS_URL_2 = "https://www.google.com/maps/place/Louvre+Museum/@48.8606111,2.3354553"
 
 
 @pytest.fixture(scope="module")
@@ -68,18 +79,17 @@ class TestCrawlers:
             print(f"    - {c.name} ({c.slug}) [credits/row: {c.credits_per_row}]")
 
     def test_get(self, client):
-        crawlers = client.crawlers.list()
-        crawler = client.crawlers.get(crawlers[0].id)
-        assert crawler.id == crawlers[0].id
-        assert crawler.name == crawlers[0].name
+        crawler = client.crawlers.get(MAPS_CRAWLER_ID)
+        assert crawler.id == MAPS_CRAWLER_ID
+        assert "Google Maps" in crawler.name
         print(f"  Got crawler: {crawler.name}")
         print(f"    max_concurrency={crawler.max_concurrency}, premium={crawler.is_premium}")
 
     def test_params(self, client):
-        crawlers = client.crawlers.list()
-        params = client.crawlers.params(crawlers[0].id)
+        params = client.crawlers.params(MAPS_CRAWLER_ID)
         assert isinstance(params, CrawlerParams)
-        print(f"  Params for: {crawlers[0].name}")
+        assert "url" in params.task_params
+        print(f"  Params for Google Maps:")
         print(f"    task_params: {list(params.task_params.keys())}")
         print(f"    squid_params: {list(params.squid_params.keys())}")
         if params.functions:
@@ -93,13 +103,8 @@ class TestSquidsCRUD:
     """Full squid lifecycle: create -> get -> update -> list -> empty -> delete."""
 
     def test_full_lifecycle(self, client):
-        # Pick a crawler
-        crawlers = client.crawlers.list()
-        crawler = crawlers[0]
-        print(f"  Using crawler: {crawler.name} ({crawler.id})")
-
         # Create
-        squid = client.squids.create(crawler.id, name="SDK Live Test")
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Live Test")
         assert isinstance(squid, Squid)
         assert squid.name == "SDK Live Test"
         squid_id = squid.id
@@ -145,32 +150,19 @@ class TestSquidsCRUD:
 
 
 class TestTasks:
-    """Create squid, add tasks, list them, delete."""
+    """Task add, list, get, iter, delete."""
 
     def test_task_lifecycle(self, client):
-        crawlers = client.crawlers.list()
-        crawler = crawlers[0]
-
-        # Get params to find the right task key
-        params = client.crawlers.params(crawler.id)
-        task_keys = list(params.task_params.keys())
-        print(f"  Crawler: {crawler.name}, task params: {task_keys}")
-
-        squid = client.squids.create(crawler.id, name="SDK Task Test")
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Task Test")
         squid_id = squid.id
         print(f"  Created squid: {squid_id}")
 
         try:
-            # Add tasks — use a valid Google Maps URL for the first crawler
-            key = task_keys[0] if task_keys else "url"
-            if key == "url":
-                tasks_input = [
-                    {key: "https://www.google.com/maps/place/Eiffel+Tower/@48.8583701,2.2944813"},
-                    {key: "https://www.google.com/maps/place/Louvre+Museum/@48.8606111,2.3354553"},
-                ]
-            else:
-                tasks_input = [{key: "test value 1"}, {key: "test value 2"}]
-            result = client.tasks.add(squid=squid_id, tasks=tasks_input)
+            # Add tasks
+            result = client.tasks.add(
+                squid=squid_id,
+                tasks=[{"url": MAPS_URL_1}, {"url": MAPS_URL_2}],
+            )
             assert len(result.tasks) >= 1
             print(f"  Added {len(result.tasks)} tasks, {result.duplicated_count} duplicates")
 
@@ -199,10 +191,189 @@ class TestTasks:
             print(f"  Cleaned up squid {squid_id}")
 
 
-# ---- Runs ----
+class TestTaskUpload:
+    """CSV upload and upload status check."""
+
+    def test_upload_csv(self, client):
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Upload Test")
+        squid_id = squid.id
+        print(f"  Created squid: {squid_id}")
+
+        try:
+            # Create a CSV file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+                f.write("url\n")
+                f.write(f"{MAPS_URL_1}\n")
+                f.write(f"{MAPS_URL_2}\n")
+                csv_path = f.name
+
+            try:
+                # Upload
+                upload_result = client.tasks.upload(squid=squid_id, file=csv_path)
+                assert "id" in upload_result
+                upload_id = upload_result["id"]
+                print(f"  Upload started: id={upload_id}")
+
+                # Check upload status
+                import time
+                for _ in range(10):
+                    status = client.tasks.upload_status(upload_id)
+                    print(f"  Upload status: state={status.state}, "
+                          f"valid={status.meta.valid}, inserted={status.meta.inserted}, "
+                          f"duplicates={status.meta.duplicates}, invalid={status.meta.invalid}")
+                    if status.state in ("completed", "done", "finished"):
+                        break
+                    time.sleep(1)
+
+                assert status.meta.valid >= 0
+                print(f"  Upload completed: {status.meta.inserted} inserted")
+
+                # Verify tasks were created
+                tasks = client.tasks.list(squid=squid_id)
+                print(f"  Tasks after upload: {len(tasks)}")
+
+            finally:
+                os.unlink(csv_path)
+
+        finally:
+            client.squids.delete(squid_id)
+            print(f"  Cleaned up squid {squid_id}")
 
 
-class TestRuns:
+# ---- Runs (full lifecycle) ----
+
+
+class TestRunsFullLifecycle:
+    """Start a run, poll stats, abort, download."""
+
+    def test_start_stats_abort(self, client):
+        """Start a run, check stats, then abort it before it consumes too many credits."""
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Run Test")
+        squid_id = squid.id
+        print(f"  Created squid: {squid_id}")
+
+        try:
+            # Configure squid params (Google Maps requires language)
+            client.squids.update(
+                squid_id,
+                params={"language": "English (United States)", "max_results": 1},
+            )
+            print("  Configured squid params")
+
+            # Add a task
+            client.tasks.add(squid=squid_id, tasks=[{"url": MAPS_URL_1}])
+            print("  Added 1 task")
+
+            # Start run
+            run = client.runs.start(squid=squid_id)
+            assert isinstance(run, Run)
+            assert run.id
+            run_id = run.id
+            print(f"  Started run: {run_id}, status={run.status}")
+
+            # Get run details
+            run_detail = client.runs.get(run_id)
+            assert run_detail.id == run_id
+            print(f"  Run detail: status={run_detail.status}, origin={run_detail.origin}")
+
+            # Check stats
+            stats = client.runs.stats(run_id)
+            assert isinstance(stats, RunStats)
+            print(f"  Stats: {stats.percent_done} done, "
+                  f"tasks={stats.total_tasks_done}/{stats.total_tasks}, "
+                  f"is_done={stats.is_done}")
+
+            # List runs for this squid
+            runs = client.runs.list(squid=squid_id)
+            assert any(r.id == run_id for r in runs)
+            print(f"  Listed {len(runs)} runs, found ours")
+
+            # Run tasks
+            run_tasks = client.runs.tasks(run_id)
+            print(f"  Run tasks: {len(run_tasks)}")
+
+            # Abort the run
+            abort_result = client.runs.abort(run_id)
+            print(f"  Abort result: {abort_result}")
+
+            # Verify aborted
+            import time
+            time.sleep(1)
+            aborted_run = client.runs.get(run_id)
+            print(f"  Run after abort: status={aborted_run.status}, "
+                  f"done_reason={aborted_run.done_reason}")
+
+        finally:
+            client.squids.delete(squid_id)
+            print(f"  Cleaned up squid {squid_id}")
+
+    def test_download_url_and_download(self, client):
+        """Test download on an existing completed run."""
+        squids = client.squids.list()
+
+        for squid in squids:
+            if squid.total_runs > 0:
+                runs = client.runs.list(squid=squid.id)
+                # Find a completed run with results
+                for run in runs:
+                    if run.status == "done" and run.total_results > 0:
+                        # Download URL
+                        url = client.runs.download_url(run.id)
+                        assert url
+                        assert "http" in url
+                        print(f"  Download URL for run {run.id}: {url[:80]}...")
+
+                        # Download to temp file
+                        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                            dest = f.name
+
+                        try:
+                            client.runs.download(run.id, dest=dest)
+                            size = os.path.getsize(dest)
+                            assert size > 0
+                            print(f"  Downloaded {size} bytes to {dest}")
+
+                            # Read first few lines
+                            with open(dest) as f:
+                                lines = f.readlines()[:3]
+                            print(f"  First lines: {[l.strip()[:80] for l in lines]}")
+                        finally:
+                            os.unlink(dest)
+
+                        return
+
+        pytest.skip("No completed runs with results found for download test")
+
+    def test_wait_on_completed_run(self, client):
+        """Test runs.wait() on an already-completed run (instant return)."""
+        squids = client.squids.list()
+
+        for squid in squids:
+            if squid.total_runs > 0:
+                runs = client.runs.list(squid=squid.id)
+                for run in runs:
+                    if run.status == "done":
+                        callbacks = []
+                        result = client.runs.wait(
+                            run.id,
+                            poll_interval=0.1,
+                            callback=lambda s: callbacks.append(s),
+                        )
+                        assert isinstance(result, Run)
+                        assert result.status == "done"
+                        assert len(callbacks) == 1
+                        assert callbacks[0].is_done is True
+                        print(f"  wait() returned immediately for completed run {run.id}")
+                        print(f"  Callback received: {callbacks[0].percent_done}")
+                        return
+
+        pytest.skip("No completed runs found for wait test")
+
+
+# ---- Runs (read-only on existing data) ----
+
+
+class TestRunsReadOnly:
     """List runs for existing squids (non-destructive)."""
 
     def test_list_runs(self, client):
@@ -210,7 +381,6 @@ class TestRuns:
         if not squids:
             pytest.skip("No squids available")
 
-        # Find a squid that has runs
         for squid in squids:
             if squid.total_runs > 0:
                 runs = client.runs.list(squid=squid.id)
@@ -218,16 +388,13 @@ class TestRuns:
                 assert all(isinstance(r, Run) for r in runs)
                 print(f"  Squid '{squid.name}': {len(runs)} runs")
 
-                # Get first run details
                 run = client.runs.get(runs[0].id)
                 print(f"    Run {run.id}: status={run.status}, results={run.total_results}, "
                       f"duration={run.duration}s, credits={run.credit_used}")
 
-                # Stats
                 stats = client.runs.stats(runs[0].id)
                 print(f"    Stats: {stats.percent_done} done, is_done={stats.is_done}")
 
-                # Run tasks
                 run_tasks = client.runs.tasks(runs[0].id)
                 print(f"    Run tasks: {len(run_tasks)}")
                 return
@@ -253,6 +420,70 @@ class TestResults:
                 return
 
         pytest.skip("No squids with results found")
+
+
+# ---- Accounts ----
+
+
+class TestAccounts:
+    def test_list(self, client):
+        accounts = client.accounts.list()
+        assert isinstance(accounts, list)
+        print(f"  Found {len(accounts)} accounts")
+        for a in accounts:
+            assert isinstance(a, Account)
+            print(f"    - {a.username} (type={a.type}, status={a.status_code_info})")
+
+    def test_types(self, client):
+        types = client.accounts.types()
+        assert len(types) > 0
+        assert all(isinstance(t, AccountType) for t in types)
+        print(f"  Found {len(types)} account types:")
+        for t in types[:5]:
+            print(f"    - {t.name} ({t.domain})")
+
+    def test_get(self, client):
+        accounts = client.accounts.list()
+        if not accounts:
+            pytest.skip("No accounts available")
+        account = client.accounts.get(accounts[0].id)
+        assert account.id == accounts[0].id
+        print(f"  Got account: {account.username} (type={account.type})")
+        print(f"    squids: {len(account.squids)}")
+
+
+# ---- Delivery ----
+
+
+class TestDelivery:
+    """Test delivery configuration (non-destructive — configures then reads back)."""
+
+    def test_email_delivery(self, client):
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Delivery Test")
+        squid_id = squid.id
+        try:
+            result = client.delivery.email(squid_id, email="test@example.com", notifications=True)
+            assert result.email == "test@example.com"
+            assert result.notifications is True
+            print(f"  Email delivery configured: {result.email}, notifications={result.notifications}")
+        finally:
+            client.squids.delete(squid_id)
+
+    def test_webhook_delivery(self, client):
+        squid = client.squids.create(MAPS_CRAWLER_ID, name="SDK Webhook Test")
+        squid_id = squid.id
+        try:
+            result = client.delivery.webhook(
+                squid_id,
+                url="https://httpbin.org/post",
+                on_done=True,
+                on_error=True,
+                on_running=False,
+            )
+            assert result.url == "https://httpbin.org/post"
+            print(f"  Webhook delivery configured: url={result.url}, active={result.is_active}")
+        finally:
+            client.squids.delete(squid_id)
 
 
 # ---- Async ----

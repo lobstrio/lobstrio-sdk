@@ -4,7 +4,16 @@ from lobstrio._version import __version__
 from lobstrio.async_client import AsyncLobstrClient, AsyncPageIterator
 from lobstrio.client import LobstrClient
 from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
+from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerParams
+from lobstrio.models.delivery import (
+    EmailDelivery,
+    GoogleSheetDelivery,
+    S3Delivery,
+    SFTPDelivery,
+    WebhookDelivery,
+    WebhookEvents,
+)
 from lobstrio.models.run import Run, RunStats
 from lobstrio.models.squid import Squid
 from lobstrio.models.task import AddTasksResult, Task, TaskStatus, UploadMeta, UploadStatus
@@ -19,8 +28,17 @@ __all__ = [
     "AuthError",
     "NotFoundError",
     "RateLimitError",
+    "Account",
+    "AccountType",
+    "SyncStatus",
     "Crawler",
     "CrawlerParams",
+    "EmailDelivery",
+    "GoogleSheetDelivery",
+    "S3Delivery",
+    "SFTPDelivery",
+    "WebhookDelivery",
+    "WebhookEvents",
     "Squid",
     "Task",
     "TaskStatus",
