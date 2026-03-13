@@ -10,7 +10,7 @@ Python SDK for the [Lobstr.io](https://lobstr.io) API — web scraping automatio
 ## Installation
 
 ```bash
-pip install lobstrio
+pip install lobstrio-sdk
 ```
 
 Requires Python 3.10+. The only runtime dependency is [httpx](https://www.python-httpx.org/).

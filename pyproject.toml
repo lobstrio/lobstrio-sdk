@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lobstrio"
+name = "lobstrio-sdk"
 dynamic = ["version"]
 description = "Python SDK for the Lobstr.io API"
 readme = "README.md"
