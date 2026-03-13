@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -34,6 +34,11 @@ class Crawler:
     is_available: bool
     has_issues: bool
     rank: int | None
+    # Detail-endpoint fields (None when from list endpoint)
+    default_worker_stats: dict[str, Any] | None = None
+    email_worker_stats: dict[str, Any] | None = None
+    input_params: list[dict[str, Any]] = field(default_factory=list)
+    result_fields: list[str] = field(default_factory=list)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Crawler:
@@ -52,6 +57,10 @@ class Crawler:
             is_available=data.get("is_available", True),
             has_issues=data.get("has_issues", False),
             rank=data.get("rank"),
+            default_worker_stats=data.get("default_worker_stats"),
+            email_worker_stats=data.get("email_worker_stats"),
+            input_params=data.get("input", []),
+            result_fields=data.get("result", []),
         )
 
 
