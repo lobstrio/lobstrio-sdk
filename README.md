@@ -10,9 +10,12 @@
   <a href="https://github.com/lobstrio/lobstrio-sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/lobstrio/lobstrio-sdk/test.yml?label=tests" alt="Tests"></a>
   <a href="https://github.com/lobstrio/lobstrio-sdk/blob/main/LICENSE"><img src="https://img.shields.io/github/license/lobstrio/lobstrio-sdk" alt="License"></a>
   <a href="https://github.com/lobstrio/lobstrio-sdk"><img src="https://img.shields.io/github/last-commit/lobstrio/lobstrio-sdk" alt="Last commit"></a>
+  <a href="https://github.com/lobstrio/lobstrio-sdk/issues"><img src="https://img.shields.io/github/issues/lobstrio/lobstrio-sdk" alt="Issues"></a>
   <a href="https://github.com/lobstrio/lobstrio-sdk/stargazers"><img src="https://img.shields.io/github/stars/lobstrio/lobstrio-sdk" alt="Stars"></a>
   <a href="https://github.com/lobstrio/lobstrio-sdk/network/members"><img src="https://img.shields.io/github/forks/lobstrio/lobstrio-sdk" alt="Forks"></a>
   <a href="https://pypi.org/project/lobstrio-sdk/"><img src="https://img.shields.io/pypi/dm/lobstrio-sdk" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/code%20style-ruff-d4aa00" alt="Ruff">
+  <img src="https://img.shields.io/badge/types-mypy-blue" alt="mypy">
 </p>
 
 ---
@@ -336,13 +339,67 @@ except APIError as e:
 | `RateLimitError` | 429 | Too many requests (has `retry_after`) |
 | `APIError` | 4xx/5xx | All other API errors |
 
-## CLI
+## CLI vs SDK
+
+| | **CLI** (`pip install lobstrio`) | **SDK** (`pip install lobstrio-sdk`) |
+|---|---|---|
+| **Use case** | Terminal workflows, quick scrapes, cron jobs | Scripts, pipelines, applications |
+| **Interface** | Shell commands | Python API |
+| **Output** | Rich tables, progress bars, CSV files | Typed dataclass models |
+| **Async** | No | Yes (`AsyncLobstrClient`) |
+| **Pagination** | Manual (`--page`, `--limit`) | Auto (`client.squids.iter()`) |
 
 For terminal workflows, see [lobstrio](https://github.com/lobstrio/lobstrio-cli) — the companion CLI tool.
 
-```bash
-pip install lobstrio
+## FAQ
+
+<details>
+<summary><strong>Where do I get an API token?</strong></summary>
+
+Sign up at [lobstr.io](https://lobstr.io), then go to [Dashboard → API](https://app.lobstr.io/dashboard/api) to generate your token.
+
+</details>
+
+<details>
+<summary><strong>Do I need the CLI installed for the SDK to work?</strong></summary>
+
+No. The SDK is standalone. However, if you have the CLI configured (`lobstr config set-token`), the SDK will automatically pick up the token from `~/.config/lobstr/config.toml` — no code changes needed.
+
+</details>
+
+<details>
+<summary><strong>How do I handle rate limiting?</strong></summary>
+
+Catch `RateLimitError` and use its `retry_after` attribute:
+
+```python
+from lobstrio import RateLimitError
+import time
+
+try:
+    results = client.results.list(squid="squid-id")
+except RateLimitError as e:
+    time.sleep(float(e.retry_after or 5))
+    results = client.results.list(squid="squid-id")
 ```
+
+</details>
+
+<details>
+<summary><strong>Can I use the async client with Django/FastAPI?</strong></summary>
+
+Yes. Use `AsyncLobstrClient` in any async context:
+
+```python
+from lobstrio import AsyncLobstrClient
+
+async def scrape_view(request):
+    async with AsyncLobstrClient() as client:
+        results = await client.results.list(squid="squid-id")
+        return results
+```
+
+</details>
 
 ## Development
 
@@ -362,6 +419,14 @@ pytest tests/test_live.py -v
 ruff check src/ tests/
 mypy src/lobstrio/
 ```
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and versioning guidelines.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
