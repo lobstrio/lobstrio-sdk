@@ -336,9 +336,9 @@ class AccountsResource:
     def __init__(self, http: _HTTPClient) -> None:
         self._http = http
 
-    def list(self) -> list[Account]:
-        """List all connected platform accounts."""
-        data = self._http.get("/accounts")
+    def list(self, *, limit: int = 50, page: int = 1) -> list[Account]:
+        """List connected platform accounts."""
+        data = self._http.get("/accounts", params={"limit": limit, "page": page})
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Account.from_api(a) for a in items]
 

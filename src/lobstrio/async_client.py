@@ -354,8 +354,8 @@ class AsyncAccountsResource:
     def __init__(self, http: _AsyncHTTPClient) -> None:
         self._http = http
 
-    async def list(self) -> list[Account]:
-        data = await self._http.get("/accounts")
+    async def list(self, *, limit: int = 50, page: int = 1) -> list[Account]:
+        data = await self._http.get("/accounts", params={"limit": limit, "page": page})
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Account.from_api(a) for a in items]
 
