@@ -31,25 +31,25 @@ def _resolve_token() -> str | None:
         import tomllib
     else:
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-not-found]
         except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore[no-redef]
+            import tomli as tomllib  # type: ignore[import-not-found,no-redef,unused-ignore]
     with open(path, "rb") as f:
         cfg = tomllib.load(f)
     return cfg.get("auth", {}).get("token")
 
 
-def _extract_error_message(body: dict, fallback: str) -> str:
+def _extract_error_message(body: dict[str, object], fallback: str) -> str:
     """Extract error message from the API's various error response shapes."""
     # Shape 1: {"error": "message"}
     msg = body.get("error")
-    if msg:
+    if isinstance(msg, str):
         return msg
     # Shape 2: {"errors": {"message": "...", "type": "...", "code": N}}
     errors = body.get("errors")
     if isinstance(errors, dict):
         msg = errors.get("message")
-        if msg:
+        if isinstance(msg, str):
             return msg
     # Fallback
     return fallback
@@ -60,7 +60,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
 
-    body: dict = {}
+    body: dict[str, object] = {}
     try:
         body = resp.json()
     except Exception:
