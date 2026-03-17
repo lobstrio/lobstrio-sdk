@@ -1,6 +1,17 @@
-# lobstrio
+<p align="center">
+  <strong>lobstrio-sdk</strong><br>
+  <em>Python SDK for the <a href="https://lobstr.io">Lobstr.io</a> API — web scraping automation platform</em>
+</p>
 
-Python SDK for the [Lobstr.io](https://lobstr.io) API — web scraping automation platform.
+<p align="center">
+  <a href="https://pypi.org/project/lobstrio-sdk/"><img src="https://img.shields.io/pypi/v/lobstrio-sdk?color=blue" alt="PyPI"></a>
+  <a href="https://pypi.org/project/lobstrio-sdk/"><img src="https://img.shields.io/pypi/pyversions/lobstrio-sdk" alt="Python"></a>
+  <a href="https://github.com/lobstrio/lobstrio-sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/lobstrio/lobstrio-sdk/test.yml?label=tests" alt="Tests"></a>
+  <a href="https://github.com/lobstrio/lobstrio-sdk/blob/main/LICENSE"><img src="https://img.shields.io/github/license/lobstrio/lobstrio-sdk" alt="License"></a>
+  <a href="https://github.com/lobstrio/lobstrio-sdk"><img src="https://img.shields.io/github/last-commit/lobstrio/lobstrio-sdk" alt="Last commit"></a>
+</p>
+
+---
 
 - Sync + async clients with the same API surface
 - Typed dataclass models for all responses
@@ -65,28 +76,32 @@ with LobstrClient() as client:
 
 All API operations are organized under resource namespaces on the client.
 
-### User
+<details>
+<summary><strong>User</strong></summary>
 
 ```python
 user = client.me()           # User profile
 balance = client.balance()   # Account balance (credits, subscription)
 ```
 
-### Crawlers
+</details>
 
-Browse the available crawler templates.
+<details>
+<summary><strong>Crawlers</strong> — browse scraper templates</summary>
 
 ```python
-crawlers = client.crawlers.list()           # All crawlers
-crawler = client.crawlers.get("crawler-id") # Single crawler
+crawlers = client.crawlers.list()              # All crawlers
+crawler = client.crawlers.get("crawler-id")    # Single crawler
 params = client.crawlers.params("crawler-id")  # Parameter schema
+attrs = client.crawlers.attributes("crawler-id")  # Result columns
 ```
 
-**Models:** `Crawler` (id, name, credits_per_row, description, logo), `CrawlerParams` (task_params, squid_params, functions)
+**Models:** `Crawler`, `CrawlerAttribute`, `CrawlerParams`
 
-### Squids
+</details>
 
-A squid is an instance of a crawler with your configuration.
+<details>
+<summary><strong>Squids</strong> — manage scraper instances</summary>
 
 ```python
 # List & iterate
@@ -105,9 +120,10 @@ client.squids.delete("squid-id")
 
 **Model:** `Squid` (id, name, crawler, is_active, concurrency, params, created_at, ...)
 
-### Tasks
+</details>
 
-Tasks are the input URLs/parameters fed into a squid.
+<details>
+<summary><strong>Tasks</strong> — manage input URLs and keywords</summary>
 
 ```python
 # List & iterate
@@ -134,11 +150,12 @@ task = client.tasks.get("task-hash")
 client.tasks.delete("task-hash")
 ```
 
-**Models:** `Task` (id, is_active, params, status, created_at), `AddTasksResult`, `UploadStatus`, `UploadMeta`
+**Models:** `Task`, `TaskStatus`, `AddTasksResult`, `UploadStatus`, `UploadMeta`
 
-### Runs
+</details>
 
-Start, monitor, and download scraping runs.
+<details>
+<summary><strong>Runs</strong> — start, monitor, and download</summary>
 
 ```python
 # Start a run
@@ -169,11 +186,12 @@ client.runs.abort("run-id")
 tasks = client.runs.tasks("run-id")
 ```
 
-**Models:** `Run` (id, squid, status, total_results, created_at, ...), `RunStats` (is_done, percent_done, total_results, ...)
+**Models:** `Run`, `RunStats`
 
-### Results
+</details>
 
-Fetch scraped results for a squid.
+<details>
+<summary><strong>Results</strong> — fetch scraped data</summary>
 
 ```python
 results = client.results.list(squid="squid-id", page_size=100)
@@ -185,9 +203,10 @@ for row in client.results.iter(squid="squid-id"):
 
 Results are returned as plain `dict` objects (the schema depends on the crawler).
 
-### Accounts
+</details>
 
-Manage connected platform accounts (e.g. Google, LinkedIn).
+<details>
+<summary><strong>Accounts</strong> — manage connected platform accounts</summary>
 
 ```python
 accounts = client.accounts.list()
@@ -205,11 +224,12 @@ client.accounts.update("account-id", type="google", params={"daily_limit": 100})
 client.accounts.delete("account-id")
 ```
 
-**Models:** `Account` (id, name, type, is_active, ...), `AccountType` (id, name, display_name), `SyncStatus` (state, meta)
+**Models:** `Account`, `AccountType`, `SyncStatus`
 
-### Delivery
+</details>
 
-Configure how results are delivered after each run.
+<details>
+<summary><strong>Delivery</strong> — configure result delivery</summary>
 
 ```python
 # Email
@@ -238,6 +258,8 @@ client.delivery.test_sftp(host="ftp.example.com", username="user",
 ```
 
 **Models:** `EmailDelivery`, `GoogleSheetDelivery`, `S3Delivery`, `WebhookDelivery`, `SFTPDelivery`
+
+</details>
 
 ## Async Client
 
@@ -268,18 +290,14 @@ All resource methods (`client.crawlers.*`, `client.squids.*`, etc.) work identic
 
 Resources that return lists support two patterns:
 
-### Single page (`.list()`)
-
-Returns one page of results. Use `limit` and `page` to control:
+**Single page** (`.list()`) — returns one page of results:
 
 ```python
 page1 = client.squids.list(limit=10, page=1)
 page2 = client.squids.list(limit=10, page=2)
 ```
 
-### Auto-pagination (`.iter()`)
-
-Returns a lazy `PageIterator` that fetches pages on demand:
+**Auto-pagination** (`.iter()`) — lazy iterator that fetches pages on demand:
 
 ```python
 for squid in client.squids.iter(limit=50):
@@ -314,6 +332,14 @@ except APIError as e:
 | `RateLimitError` | 429 | Too many requests (has `retry_after`) |
 | `APIError` | 4xx/5xx | All other API errors |
 
+## CLI
+
+For terminal workflows, see [lobstrio](https://github.com/lobstrio/lobstrio-cli) — the companion CLI tool.
+
+```bash
+pip install lobstrio
+```
+
 ## Development
 
 ```bash
@@ -335,4 +361,4 @@ mypy src/lobstrio/
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE) for details.
+[Apache 2.0](LICENSE)
