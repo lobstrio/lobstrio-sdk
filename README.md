@@ -356,7 +356,7 @@ For terminal workflows, see [lobstrio](https://github.com/lobstrio/lobstrio-cli)
 <details>
 <summary><strong>Where do I get an API token?</strong></summary>
 
-Sign up at [lobstr.io](https://lobstr.io), then go to [Dashboard → API](https://app.lobstr.io/dashboard/api) to generate your token.
+Go to [Dashboard → API](https://app.lobstr.io/dashboard/api) to find your token. It's always available there, pre-generated.
 
 </details>
 
