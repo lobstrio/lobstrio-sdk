@@ -9,7 +9,7 @@ import httpx
 
 from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
 from lobstrio.models.account import Account, AccountType, SyncStatus
-from lobstrio.models.crawler import Crawler, CrawlerParams
+from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
 from lobstrio.models.delivery import (
     EmailDelivery,
     GoogleSheetDelivery,
@@ -154,6 +154,12 @@ class AsyncCrawlersResource:
     async def params(self, crawler_id: str) -> CrawlerParams:
         data = await self._http.get(f"/crawlers/{crawler_id}/params")
         return CrawlerParams.from_api(data)
+
+    async def attributes(self, crawler_id: str) -> list[CrawlerAttribute]:
+        """Get result attributes (columns) for a crawler."""
+        data = await self._http.get(f"/crawlers/{crawler_id}/attributes")
+        items = data.get("data", data) if isinstance(data, dict) else data
+        return [CrawlerAttribute.from_api(a) for a in items]
 
 
 class AsyncSquidsResource:

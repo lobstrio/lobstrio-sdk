@@ -65,6 +65,29 @@ class Crawler:
 
 
 @dataclass
+class CrawlerAttribute:
+    """A result attribute (column) produced by a crawler."""
+
+    name: str
+    type: str
+    example: Any
+    function: str
+    is_main: bool
+    description: str
+
+    @classmethod
+    def from_api(cls, data: dict[str, Any]) -> CrawlerAttribute:
+        return cls(
+            name=data["name"],
+            type=data.get("type", ""),
+            example=data.get("example"),
+            function=data.get("function", ""),
+            is_main=data.get("is_main", False),
+            description=data.get("description", ""),
+        )
+
+
+@dataclass
 class CrawlerParams:
     """Parameters accepted by a crawler."""
 

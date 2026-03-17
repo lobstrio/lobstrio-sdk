@@ -5,7 +5,7 @@ from lobstrio.async_client import AsyncLobstrClient, AsyncPageIterator
 from lobstrio.client import LobstrClient
 from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
 from lobstrio.models.account import Account, AccountType, SyncStatus
-from lobstrio.models.crawler import Crawler, CrawlerParams
+from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
 from lobstrio.models.delivery import (
     EmailDelivery,
     GoogleSheetDelivery,
@@ -32,6 +32,7 @@ __all__ = [
     "AccountType",
     "SyncStatus",
     "Crawler",
+    "CrawlerAttribute",
     "CrawlerParams",
     "EmailDelivery",
     "GoogleSheetDelivery",
