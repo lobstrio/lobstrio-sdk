@@ -1,7 +1,7 @@
 from lobstrio.models.crawler import Crawler, CrawlerParams, _resolve_credits
 from lobstrio.models.run import Run, RunStats
 from lobstrio.models.squid import Squid
-from lobstrio.models.task import AddTasksResult, Task, TaskStatus, UploadMeta, UploadStatus
+from lobstrio.models.task import AddTasksResult, Task, UploadStatus
 from lobstrio.models.user import Balance, User
 
 

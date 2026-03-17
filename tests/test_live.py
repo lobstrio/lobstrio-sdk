@@ -89,7 +89,7 @@ class TestCrawlers:
         params = client.crawlers.params(MAPS_CRAWLER_ID)
         assert isinstance(params, CrawlerParams)
         assert "url" in params.task_params
-        print(f"  Params for Google Maps:")
+        print("  Params for Google Maps:")
         print(f"    task_params: {list(params.task_params.keys())}")
         print(f"    squid_params: {list(params.squid_params.keys())}")
         if params.functions:
@@ -336,7 +336,7 @@ class TestRunsFullLifecycle:
                             # Read first few lines
                             with open(dest) as f:
                                 lines = f.readlines()[:3]
-                            print(f"  First lines: {[l.strip()[:80] for l in lines]}")
+                            print(f"  First lines: {[line.strip()[:80] for line in lines]}")
                         finally:
                             os.unlink(dest)
 

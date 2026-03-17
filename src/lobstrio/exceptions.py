@@ -22,6 +22,8 @@ class NotFoundError(APIError):
 class RateLimitError(APIError):
     """Raised on 429 Too Many Requests responses."""
 
-    def __init__(self, status_code: int, message: str, body: dict | None = None, retry_after: str | None = None) -> None:
+    def __init__(
+        self, status_code: int, message: str, body: dict | None = None, retry_after: str | None = None,
+    ) -> None:
         super().__init__(status_code, message, body)
         self.retry_after = retry_after

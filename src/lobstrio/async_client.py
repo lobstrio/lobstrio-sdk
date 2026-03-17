@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 
 import httpx
 
@@ -409,9 +409,13 @@ class AsyncDeliveryResource:
         )
         return EmailDelivery.from_api(data)
 
-    async def google_sheet(self, squid: str, *, url: str, append: bool = False, is_active: bool = True) -> GoogleSheetDelivery:
+    async def google_sheet(
+        self, squid: str, *, url: str, append: bool = False, is_active: bool = True,
+    ) -> GoogleSheetDelivery:
         data = await self._http.post(
-            "/delivery", json={"google_sheet_fields": {"url": url, "append": append, "is_active": is_active}}, params={"squid": squid},
+            "/delivery",
+            json={"google_sheet_fields": {"url": url, "append": append, "is_active": is_active}},
+            params={"squid": squid},
         )
         return GoogleSheetDelivery.from_api(data)
 
@@ -435,18 +439,25 @@ class AsyncDeliveryResource:
             "/delivery",
             json={"webhook_fields": {
                 "url": url, "is_active": is_active, "retry": retry,
-                "events": {"run.running": on_running, "run.paused": on_paused, "run.done": on_done, "run.error": on_error},
+                "events": {
+                    "run.running": on_running, "run.paused": on_paused,
+                    "run.done": on_done, "run.error": on_error,
+                },
             }},
             params={"squid": squid},
         )
         return WebhookDelivery.from_api(data)
 
     async def sftp(
-        self, squid: str, *, host: str, port: int = 22, username: str, password: str, directory: str, is_active: bool = True,
+        self, squid: str, *, host: str, port: int = 22, username: str,
+        password: str, directory: str, is_active: bool = True,
     ) -> SFTPDelivery:
         data = await self._http.post(
             "/delivery",
-            json={"ftp_fields": {"host": host, "port": port, "username": username, "password": password, "directory": directory, "is_active": is_active}},
+            json={"ftp_fields": {
+                "host": host, "port": port, "username": username,
+                "password": password, "directory": directory, "is_active": is_active,
+            }},
             params={"squid": squid},
         )
         return SFTPDelivery.from_api(data)
@@ -457,7 +468,9 @@ class AsyncDeliveryResource:
     async def test_google_sheet(self, *, url: str) -> dict[str, Any]:
         return await self._http.post("/delivery/test-googlesheet", json={"url": url})
 
-    async def test_s3(self, *, bucket: str, aws_access_key: str | None = None, aws_secret_key: str | None = None) -> dict[str, Any]:
+    async def test_s3(
+        self, *, bucket: str, aws_access_key: str | None = None, aws_secret_key: str | None = None,
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {"bucket": bucket}
         if aws_access_key is not None:
             body["aws_access_key"] = aws_access_key
@@ -468,7 +481,9 @@ class AsyncDeliveryResource:
     async def test_webhook(self, *, url: str) -> dict[str, Any]:
         return await self._http.post("/delivery/test-webhook", json={"url": url})
 
-    async def test_sftp(self, *, host: str, port: int = 22, username: str, password: str, directory: str) -> dict[str, Any]:
+    async def test_sftp(
+        self, *, host: str, port: int = 22, username: str, password: str, directory: str,
+    ) -> dict[str, Any]:
         return await self._http.post("/delivery/test-sftp", json={
             "host": host, "port": port, "username": username, "password": password, "directory": directory,
         })

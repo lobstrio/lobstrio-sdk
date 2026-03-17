@@ -110,7 +110,9 @@ async def test_async_runs_wait(async_client, httpx_mock):
             "is_done": True,
         }
     )
-    httpx_mock.add_response(json={"id": "r1", "status": "finished", "total_results": 10, "duration": 5.0, "credit_used": 1.0})
+    httpx_mock.add_response(json={
+        "id": "r1", "status": "finished", "total_results": 10, "duration": 5.0, "credit_used": 1.0,
+    })
     run = await async_client.runs.wait("r1", poll_interval=0.01)
     assert run.status == "finished"
 
