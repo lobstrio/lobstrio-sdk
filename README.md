@@ -1,4 +1,5 @@
 <p align="center">
+  <img src=".github/logo.svg" alt="Lobstr.io" width="80"><br>
   <strong>lobstrio-sdk</strong><br>
   <em>Python SDK for the <a href="https://lobstr.io">Lobstr.io</a> API — web scraping automation platform</em>
 </p>
