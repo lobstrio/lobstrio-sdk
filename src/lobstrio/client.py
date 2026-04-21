@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
+from lobstrio.exceptions import APIError
 from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
 from lobstrio.models.delivery import (
@@ -241,7 +242,18 @@ class RunsResource:
 
     def start(self, *, squid: str) -> Run:
         """Start a new run."""
-        data = self._http.post("/runs", json={"squid": squid})
+        try:
+            data = self._http.post("/runs", json={"squid": squid})
+        except APIError as e:
+            if "not ready" in e.message.lower():
+                raise APIError(
+                    e.status_code,
+                    "Squid is not ready. Call squids.update(squid_id, params={...}) with the "
+                    "crawler's squid-level params before starting a run. Pass None for optional "
+                    "params you don't need to set, e.g. squids.update(squid_id, params={'max_results': None}).",
+                    e.body,
+                ) from e
+            raise
         return Run.from_api(data)
 
     def list(self, *, squid: str, limit: int = 50, page: int = 1) -> list[Run]:
