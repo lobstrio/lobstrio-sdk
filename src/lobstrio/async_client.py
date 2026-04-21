@@ -252,11 +252,12 @@ class AsyncTasksResource:
 
     async def upload(self, *, squid: str, file: str | Path) -> dict[str, Any]:
         path = Path(file)
+        content_type = "text/tab-separated-values" if path.suffix.lower() == ".tsv" else "text/csv"
         with open(path, "rb") as f:
             return await self._http.post(
                 "/tasks/upload",
                 data={"squid": squid},
-                files={"file": (path.name, f)},
+                files={"file": (path.name, f, content_type)},
             )
 
     async def upload_status(self, upload_id: str) -> UploadStatus:
