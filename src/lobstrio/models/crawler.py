@@ -4,15 +4,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-def _resolve_credits(value: Any) -> int | None:
-    """Normalize credits fields that can be int, dict, or None."""
+def _resolve_credits(value: Any) -> float | None:
+    """Normalize credits fields that can be int, float, dict, or None."""
     if value is None:
         return None
     if isinstance(value, (int, float)):
-        return int(value)
+        return float(value)
     if isinstance(value, dict):
         v = value.get("current", value.get("legacy"))
-        return int(v) if v is not None else None
+        return float(v) if v is not None else None
     return None
 
 
@@ -24,8 +24,8 @@ class Crawler:
     name: str
     slug: str
     description: str | None
-    credits_per_row: int | None
-    credits_per_email: int | None
+    credits_per_row: float | None
+    credits_per_email: float | None
     max_concurrency: int
     account: bool
     has_email_verification: bool
