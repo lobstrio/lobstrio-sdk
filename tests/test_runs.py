@@ -1,3 +1,7 @@
+import pytest
+
+from lobstrio import RunTimeout
+
 RUN_DATA = {
     "id": "r1",
     "status": "finished",
@@ -84,6 +88,26 @@ def test_runs_wait(client, httpx_mock):
     assert run.id == "r1"
     assert len(callbacks) == 1
     assert callbacks[0].is_done is True
+
+
+def test_runs_call(client, httpx_mock):
+    # start -> stats (done) -> get final run
+    httpx_mock.add_response(json=RUN_DATA)
+    httpx_mock.add_response(json=STATS_DATA)
+    httpx_mock.add_response(json=RUN_DATA)
+    run = client.runs.call(squid="sq1", poll_interval=0.01)
+    assert run.id == "r1"
+    assert run.status == "finished"
+
+
+def test_runs_wait_timeout(client, httpx_mock):
+    # run never finishes -> wait() raises RunTimeout once the timeout is hit
+    not_done = {**STATS_DATA, "is_done": False, "percent_done": "10%"}
+    httpx_mock.add_response(json=not_done)
+    with pytest.raises(RunTimeout) as exc:
+        client.runs.wait("r1" * 16, poll_interval=0.01, timeout=0.0)
+    assert exc.value.run_id == "r1" * 16
+    assert exc.value.timeout == 0.0
 
 
 def test_runs_iter(client, httpx_mock):

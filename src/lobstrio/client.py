@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
-from lobstrio.exceptions import APIError
+from lobstrio.exceptions import APIError, RunTimeout
 from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
 from lobstrio.models.delivery import (
@@ -302,21 +302,51 @@ class RunsResource:
         url = self.download_url(run_id)
         self._http.download(url, dest)
 
+    def call(
+        self,
+        *,
+        squid: str,
+        poll_interval: float = 3.0,
+        timeout: float | None = None,
+        callback: Callable[[RunStats], Any] | None = None,
+    ) -> Run:
+        """Start a run and wait for it to finish (sync convenience).
+
+        Combines ``start()`` and ``wait()`` and returns the finished Run.
+        Use ``start()`` instead if you want the Run back immediately without
+        waiting. Raises ``RunTimeout`` if ``timeout`` (seconds) is exceeded.
+        """
+        run = self.start(squid=squid)
+        return self.wait(run.id, poll_interval=poll_interval, timeout=timeout, callback=callback)
+
     def wait(
         self,
         run_id: str,
         *,
         poll_interval: float = 3.0,
+        timeout: float | None = None,
         callback: Callable[[RunStats], Any] | None = None,
     ) -> Run:
-        """Poll until a run completes, then return the final Run."""
+        """Poll until a run completes, then return the final Run.
+
+        If ``timeout`` (seconds) is given and the run has not finished by then,
+        raises ``RunTimeout``; the run keeps running server-side. ``timeout=None``
+        (the default) waits indefinitely.
+        """
+        start = time.monotonic()
         while True:
             st = self.stats(run_id)
             if callback is not None:
                 callback(st)
             if st.is_done:
                 break
-            time.sleep(poll_interval)
+            if timeout is not None:
+                remaining = timeout - (time.monotonic() - start)
+                if remaining <= 0:
+                    raise RunTimeout(run_id, timeout)
+                time.sleep(min(poll_interval, remaining))
+            else:
+                time.sleep(poll_interval)
         return self.get(run_id)
 
 
