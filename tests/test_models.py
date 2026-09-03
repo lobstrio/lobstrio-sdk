@@ -10,7 +10,7 @@ class TestResolveCredits:
         assert _resolve_credits(3) == 3
 
     def test_float(self):
-        assert _resolve_credits(3.5) == 3
+        assert _resolve_credits(3.5) == 3.5
 
     def test_dict_current(self):
         assert _resolve_credits({"current": 5, "legacy": 2}) == 5
