@@ -118,6 +118,22 @@ async def test_async_runs_wait(async_client, httpx_mock):
 
 
 @pytest.mark.asyncio
+async def test_async_runs_call(async_client, httpx_mock):
+    run_json = {
+        "id": "r1", "status": "finished", "total_results": 10, "duration": 5.0, "credit_used": 1.0,
+    }
+    httpx_mock.add_response(json=run_json)  # start
+    httpx_mock.add_response(json={          # stats (done)
+        "percent_done": "100%", "total_tasks": 1, "total_tasks_done": 1, "total_tasks_left": 0,
+        "total_results": 10, "duration": 5.0, "eta": "", "is_done": True,
+    })
+    httpx_mock.add_response(json=run_json)  # get final run
+    run = await async_client.runs.call(squid="sq1", poll_interval=0.01)
+    assert run.id == "r1"
+    assert run.status == "finished"
+
+
+@pytest.mark.asyncio
 async def test_async_results_list(async_client, httpx_mock):
     httpx_mock.add_response(json={"data": [{"id": "res1", "name": "Test"}], "total_pages": 1})
     results = await async_client.results.list(squid="sq1")

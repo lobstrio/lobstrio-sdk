@@ -27,3 +27,17 @@ class RateLimitError(APIError):
     ) -> None:
         super().__init__(status_code, message, body)
         self.retry_after = retry_after
+
+
+class RunTimeout(TimeoutError):
+    """Raised when a run does not finish within the wait timeout.
+
+    Subclasses the built-in ``TimeoutError`` so it can be caught either way.
+    The run itself is not aborted — it keeps running server-side and can be
+    re-attached later with ``runs.wait(run_id)`` / ``runs.get(run_id)``.
+    """
+
+    def __init__(self, run_id: str, timeout: float) -> None:
+        self.run_id = run_id
+        self.timeout = timeout
+        super().__init__(f"Run {run_id} did not finish within {timeout}s")

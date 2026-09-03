@@ -3,7 +3,7 @@
 from lobstrio._version import __version__
 from lobstrio.async_client import AsyncLobstrClient, AsyncPageIterator
 from lobstrio.client import LobstrClient
-from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
+from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError, RunTimeout
 from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
 from lobstrio.models.delivery import (
@@ -28,6 +28,7 @@ __all__ = [
     "AuthError",
     "NotFoundError",
     "RateLimitError",
+    "RunTimeout",
     "Account",
     "AccountType",
     "SyncStatus",
