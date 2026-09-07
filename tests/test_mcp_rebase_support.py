@@ -2,12 +2,10 @@
 raw payloads on models, crawlers pagination, a results envelope + run/task
 filters, and a User-Agent / transport hook on the client."""
 import httpx
-import pytest
 
 from lobstrio import LobstrClient
 from lobstrio.models.crawler import Crawler, CrawlerParams
 from lobstrio.models.run import RunStats
-
 
 # --- raw payloads --------------------------------------------------------
 
