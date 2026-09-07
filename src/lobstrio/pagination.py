@@ -15,6 +15,7 @@ class PageIterator(Generic[T], Iterator[T]):
         model_cls: type[T],
         *,
         data_key: str = "data",
+        max_pages: int | None = None,
         **params: Any,
     ) -> None:
         self._fetch = fetch_page
@@ -22,6 +23,10 @@ class PageIterator(Generic[T], Iterator[T]):
         self._data_key = data_key
         self._params = params
         self._page = params.pop("page", 1)
+        # Cap the number of pages fetched. None (the default) walks every page;
+        # set it as a safety limit against a runaway total_pages.
+        self._max_pages = max_pages
+        self._pages_fetched = 0
         self._buffer: list[T] = []
         self._done = False
 
@@ -39,7 +44,12 @@ class PageIterator(Generic[T], Iterator[T]):
         return self._buffer.pop(0)
 
     def _load_next_page(self) -> None:
+        if self._max_pages is not None and self._pages_fetched >= self._max_pages:
+            self._done = True
+            return
+
         data = self._fetch(page=self._page, **self._params)
+        self._pages_fetched += 1
 
         items = data.get(self._data_key, data) if isinstance(data, dict) else data
         if not items:
@@ -54,8 +64,14 @@ class PageIterator(Generic[T], Iterator[T]):
 
         self._page += 1
 
+        # A bare-list response carries no pagination envelope, so treat it as the
+        # only page — otherwise a loose endpoint that keeps returning the same
+        # list would iterate forever.
+        if not isinstance(data, dict):
+            self._done = True
+            return
+
         # Detect last page
-        if isinstance(data, dict):
-            total_pages = data.get("total_pages")
-            if total_pages is not None and self._page > total_pages:
-                self._done = True
+        total_pages = data.get("total_pages")
+        if total_pages is not None and self._page > total_pages:
+            self._done = True

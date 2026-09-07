@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-07
+
+### Added
+
+- `max_pages` on `PageIterator` / `AsyncPageIterator` (and thus every `iter()`
+  method via `**kwargs`) — cap the number of pages walked as a safety limit
+  against a runaway `total_pages`. Defaults to `None` (walk every page), so
+  existing `iter()` behaviour is unchanged.
+
+- `py.typed` marker — the package now advertises its inline type hints (PEP 561),
+  so downstream type-checkers no longer skip `lobstrio`.
+
+### Fixed
+
+- `iter()` now terminates on a bare-list response (an endpoint returning a plain
+  JSON array instead of a `{data, total_pages, ...}` envelope): it is treated as
+  a single page rather than being re-fetched forever.
+
 ## [0.3.0] - 2026-09-07
 
 ### Added

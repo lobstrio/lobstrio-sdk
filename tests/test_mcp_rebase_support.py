@@ -82,3 +82,48 @@ def test_transport_hook_is_used():
     c = LobstrClient(token="t", base_url="https://api.lobstr.io/v1/",
                      transport=httpx.MockTransport(handler))
     assert c.balance().available == 42
+
+
+# --- iter() pagination controls -----------------------------------------
+
+def _crawler_client(handler):
+    return LobstrClient(token="t", base_url="https://api.lobstr.io/v1/",
+                        transport=httpx.MockTransport(handler))
+
+
+def test_iter_respects_max_pages():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(dict(request.url.params).get("page", 1))
+        calls.append(page)
+        return httpx.Response(200, json={
+            "data": [{"id": f"c{page}", "name": "x", "slug": "x"}], "total_pages": 100})
+
+    got = list(_crawler_client(handler).crawlers.iter(max_pages=3))
+    assert [c.id for c in got] == ["c1", "c2", "c3"]
+    assert calls == [1, 2, 3]          # stopped at the cap, not total_pages
+
+
+def test_iter_default_walks_all_pages():
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(dict(request.url.params).get("page", 1))
+        return httpx.Response(200, json={
+            "data": [{"id": f"c{page}", "name": "x", "slug": "x"}], "total_pages": 3})
+
+    got = list(_crawler_client(handler).crawlers.iter())   # max_pages defaults to None
+    assert [c.id for c in got] == ["c1", "c2", "c3"]        # unchanged all-pages behavior
+
+
+def test_iter_terminates_on_a_bare_list():
+    """A loose endpoint returning a plain list has no pagination envelope; iter()
+    must treat it as a single page rather than looping forever."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, json=[{"id": "only", "name": "x", "slug": "x"}])
+
+    got = list(_crawler_client(handler).crawlers.iter())
+    assert [c.id for c in got] == ["only"]
+    assert len(calls) == 1
