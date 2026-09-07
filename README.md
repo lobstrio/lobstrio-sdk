@@ -73,6 +73,7 @@ with LobstrClient() as client:
     run = client.runs.start(squid=squid.id)
 
     # Wait for completion with progress callback
+    #   (or use client.runs.call(squid=squid.id) to start + wait in one call)
     final = client.runs.wait(run.id, callback=lambda s: print(f"{s.percent_done}%"))
 
     # Download results
@@ -181,6 +182,18 @@ print(f"{stats.percent_done}% done, {stats.total_results} results")
 # Wait for completion (blocking, with optional progress callback)
 final = client.runs.wait("run-id", poll_interval=5.0,
                           callback=lambda s: print(f"{s.percent_done}%"))
+
+# Start and wait in one call (mirrors start() + wait())
+final = client.runs.call(squid="squid-id", poll_interval=5.0,
+                         callback=lambda s: print(f"{s.percent_done}%"))
+
+# Bound the wait: RunTimeout (a TimeoutError subclass) if it overruns.
+# The run keeps going server-side — re-attach later with wait()/get().
+from lobstrio import RunTimeout
+try:
+    final = client.runs.wait("run-id", timeout=600)   # also on call()
+except RunTimeout:
+    ...
 
 # Download results
 url = client.runs.download_url("run-id")   # signed S3 URL
