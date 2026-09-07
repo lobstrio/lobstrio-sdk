@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -20,10 +20,12 @@ class Run:
     export_done: bool
     started_at: str | None
     ended_at: str | None
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Run:
         return cls(
+            raw=data,
             id=data["id"],
             status=data.get("status", ""),
             total_results=data.get("total_results", 0),
@@ -52,10 +54,12 @@ class RunStats:
     eta: str
     current_task: str | None
     is_done: bool
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> RunStats:
         return cls(
+            raw=data,
             percent_done=data.get("percent_done", "0%"),
             total_tasks=data.get("total_tasks", 0),
             total_tasks_done=data.get("total_tasks_done", 0),

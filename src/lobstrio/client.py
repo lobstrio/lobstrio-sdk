@@ -28,11 +28,23 @@ from lobstrio.pagination import PageIterator
 class _HTTPClient:
     """Low-level sync HTTP transport."""
 
-    def __init__(self, token: str, base_url: str, timeout: float) -> None:
+    def __init__(
+        self,
+        token: str,
+        base_url: str,
+        timeout: float,
+        *,
+        user_agent: str | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        headers = {"authorization": f"Token {token}"}
+        if user_agent:
+            headers["user-agent"] = user_agent
         self._client = httpx.Client(
             base_url=base_url,
-            headers={"authorization": f"Token {token}"},
+            headers=headers,
             timeout=timeout,
+            transport=transport,
         )
 
     @staticmethod
@@ -88,10 +100,18 @@ class CrawlersResource:
         self._http = http
 
     def list(self) -> list[Crawler]:
-        """List all available crawlers."""
+        """List crawlers (single page)."""
         data = self._http.get("/crawlers")
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Crawler.from_api(c) for c in items]
+
+    def iter(self, **kwargs: Any) -> PageIterator[Crawler]:
+        """Iterate all crawlers across pages (the catalog spans several pages)."""
+        return PageIterator(
+            lambda **p: self._http.get("/crawlers", params=p),
+            Crawler,
+            **kwargs,
+        )
 
     def get(self, crawler_id: str) -> Crawler:
         """Get a single crawler by ID."""
@@ -356,20 +376,63 @@ class ResultsResource:
     def __init__(self, http: _HTTPClient) -> None:
         self._http = http
 
-    def list(self, *, squid: str, page: int = 1, page_size: int = 100) -> list[dict[str, Any]]:
-        """Fetch results (single page)."""
-        data = self._http.get("/results", params={"squid": squid, "page": page, "page_size": page_size})
-        items = data.get("data", data) if isinstance(data, dict) else data
+    def page(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> dict[str, Any]:
+        """Fetch one page of results WITH the pagination envelope
+        (total_results, page, total_pages, next, data). Filter by exactly one of
+        squid / run / task."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if squid is not None:
+            params["squid"] = squid
+        if run is not None:
+            params["run"] = run
+        if task is not None:
+            params["task"] = task
+        data = self._http.get("/results", params=params)
+        return data if isinstance(data, dict) else {"data": list(data)}
+
+    def list(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Fetch results rows (single page). Use page() for the full envelope."""
+        env = self.page(squid=squid, run=run, task=task, page=page, page_size=page_size)
+        items = env.get("data", env) if isinstance(env, dict) else env
         return list(items)
 
-    def iter(self, *, squid: str, page_size: int = 100, **kwargs: Any) -> PageIterator[dict[str, Any]]:
+    def iter(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page_size: int = 100,
+        **kwargs: Any,
+    ) -> PageIterator[dict[str, Any]]:
         """Iterate all results across pages."""
+        params: dict[str, Any] = {"page_size": page_size, **kwargs}
+        if squid is not None:
+            params["squid"] = squid
+        if run is not None:
+            params["run"] = run
+        if task is not None:
+            params["task"] = task
         return PageIterator(
             lambda **p: self._http.get("/results", params=p),
             dict,
-            squid=squid,
-            page_size=page_size,
-            **kwargs,
+            **params,
         )
 
 
@@ -613,6 +676,9 @@ class LobstrClient:
         token: str | None = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
+        *,
+        user_agent: str | None = None,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         resolved = token or _resolve_token()
         if not resolved:
@@ -620,7 +686,9 @@ class LobstrClient:
                 "No API token found. Pass token= explicitly, set LOBSTR_TOKEN env var, "
                 "or run 'lobstr config set-token' to save one."
             )
-        self._http = _HTTPClient(resolved, base_url, timeout)
+        self._http = _HTTPClient(
+            resolved, base_url, timeout, user_agent=user_agent, transport=transport
+        )
         self.crawlers = CrawlersResource(self._http)
         self.squids = SquidsResource(self._http)
         self.tasks = TasksResource(self._http)

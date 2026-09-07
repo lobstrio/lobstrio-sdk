@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -33,10 +33,12 @@ class Balance:
     consumed: int
     used_slots: int
     total_available_slots: int
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Balance:
         return cls(
+            raw=data,
             available=data.get("available", 0),
             consumed=data.get("consumed", 0),
             used_slots=data.get("used_slots", 0),
