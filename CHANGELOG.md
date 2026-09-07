@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against a runaway `total_pages`. Defaults to `None` (walk every page), so
   existing `iter()` behaviour is unchanged.
 
+- `py.typed` marker — the package now advertises its inline type hints (PEP 561),
+  so downstream type-checkers no longer skip `lobstrio`.
+
 ### Fixed
 
 - `iter()` now terminates on a bare-list response (an endpoint returning a plain
