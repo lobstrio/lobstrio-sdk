@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `runs.call()` — start a run and wait for it to finish in one call
+  (`squid=`, `poll_interval=`, `timeout=`, `callback=`), returning the finished
+  `Run` (sync + async); mirrors `start()`/`call()` semantics
+- `runs.wait()` gains a `timeout` (seconds); raises the new `RunTimeout`
+  (a `TimeoutError` subclass, exported from the package) if the run doesn't
+  finish in time. `timeout=None` keeps the wait-forever default. A timeout does
+  not abort the run — it keeps running server-side and can be re-attached with
+  `wait()` / `get()`
 - `raw` attribute on `Crawler`, `CrawlerParams`, `Run`, `RunStats`, `Squid`, and
   `Balance` — the untouched API payload, for callers that need a field the
   dataclass drops or renames
