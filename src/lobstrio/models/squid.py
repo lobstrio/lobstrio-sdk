@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -21,10 +21,12 @@ class Squid:
     total_runs: int
     export_unique_results: bool
     params: dict[str, Any]
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Squid:
         return cls(
+            raw=data,
             id=data["id"],
             name=data.get("name", ""),
             crawler=data.get("crawler", ""),

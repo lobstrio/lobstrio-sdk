@@ -39,10 +39,15 @@ class Crawler:
     email_worker_stats: dict[str, Any] | None = None
     input_params: list[dict[str, Any]] = field(default_factory=list)
     result_fields: list[str] = field(default_factory=list)
+    # Untouched API payload, so callers that need a field the dataclass drops or
+    # renames (e.g. the raw credits dict, or `result`/`input` under their API keys)
+    # can still reach it.
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Crawler:
         return cls(
+            raw=data,
             id=data["id"],
             name=data.get("name", ""),
             slug=data.get("slug", ""),
@@ -94,15 +99,22 @@ class CrawlerParams:
     task_params: dict[str, Any]
     squid_params: dict[str, Any]
     functions: dict[str, Any]
+    raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> CrawlerParams:
         task = data.get("task", {})
         squid = data.get("squid", {})
-        # Functions may be nested inside squid params or at top level
-        functions = squid.pop("functions", {}) if isinstance(squid, dict) else {}
+        # Functions may be nested inside squid params or at top level. Do NOT
+        # mutate `squid` (it belongs to `data`, which we keep verbatim in `raw`).
+        functions: dict[str, Any] = {}
+        squid_params = squid
+        if isinstance(squid, dict) and "functions" in squid:
+            functions = squid["functions"]
+            squid_params = {k: v for k, v in squid.items() if k != "functions"}
         return cls(
             task_params=task,
-            squid_params=squid,
+            squid_params=squid_params,
             functions=functions,
+            raw=data,
         )

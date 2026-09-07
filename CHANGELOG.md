@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-07
+
+### Added
+
+- `raw` attribute on `Crawler`, `CrawlerParams`, `Run`, `RunStats`, `Squid`, and
+  `Balance` — the untouched API payload, for callers that need a field the
+  dataclass drops or renames
+- `crawlers.iter()` — paginated iteration over the full crawler catalog (sync + async)
+- `results.page()` — one page of results with the full pagination envelope
+  (`total_results`, `page`, `total_pages`, `next`, `data`), filterable by
+  `squid` / `run` / `task` (sync + async)
+- `results.list()` / `results.iter()` now accept `run` and `task` filters, not just `squid`
+- `user_agent=` and `transport=` parameters on `LobstrClient` and `AsyncLobstrClient`
+
+### Fixed
+
+- `CrawlerParams.from_api()` no longer mutates its input payload
+
 ## [0.2.1] - 2026-03-17
 
 ### Added

@@ -28,11 +28,23 @@ from lobstrio.models.user import Balance, User
 class _AsyncHTTPClient:
     """Low-level async HTTP transport."""
 
-    def __init__(self, token: str, base_url: str, timeout: float) -> None:
+    def __init__(
+        self,
+        token: str,
+        base_url: str,
+        timeout: float,
+        *,
+        user_agent: str | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        headers = {"authorization": f"Token {token}"}
+        if user_agent:
+            headers["user-agent"] = user_agent
         self._client = httpx.AsyncClient(
             base_url=base_url,
-            headers={"authorization": f"Token {token}"},
+            headers=headers,
             timeout=timeout,
+            transport=transport,
         )
 
     @staticmethod
@@ -148,6 +160,14 @@ class AsyncCrawlersResource:
         data = await self._http.get("/crawlers")
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Crawler.from_api(c) for c in items]
+
+    def iter(self, **kwargs: Any) -> AsyncPageIterator:
+        """Iterate all crawlers across pages."""
+        return AsyncPageIterator(
+            lambda **p: self._http.get("/crawlers", params=p),
+            Crawler,
+            **kwargs,
+        )
 
     async def get(self, crawler_id: str) -> Crawler:
         data = await self._http.get(f"/crawlers/{crawler_id}")
@@ -379,18 +399,61 @@ class AsyncResultsResource:
     def __init__(self, http: _AsyncHTTPClient) -> None:
         self._http = http
 
-    async def list(self, *, squid: str, page: int = 1, page_size: int = 100) -> list[dict[str, Any]]:
-        data = await self._http.get("/results", params={"squid": squid, "page": page, "page_size": page_size})
-        items = data.get("data", data) if isinstance(data, dict) else data
+    async def page(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> dict[str, Any]:
+        """Fetch one page of results WITH the pagination envelope
+        (total_results, page, total_pages, next, data). Filter by exactly one of
+        squid / run / task."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if squid is not None:
+            params["squid"] = squid
+        if run is not None:
+            params["run"] = run
+        if task is not None:
+            params["task"] = task
+        data = await self._http.get("/results", params=params)
+        return data if isinstance(data, dict) else {"data": list(data)}
+
+    async def list(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> list[dict[str, Any]]:
+        env = await self.page(squid=squid, run=run, task=task, page=page, page_size=page_size)
+        items = env.get("data", env) if isinstance(env, dict) else env
         return list(items)
 
-    def iter(self, *, squid: str, page_size: int = 100, **kwargs: Any) -> AsyncPageIterator:
+    def iter(
+        self,
+        *,
+        squid: str | None = None,
+        run: str | None = None,
+        task: str | None = None,
+        page_size: int = 100,
+        **kwargs: Any,
+    ) -> AsyncPageIterator:
+        params: dict[str, Any] = {"page_size": page_size, **kwargs}
+        if squid is not None:
+            params["squid"] = squid
+        if run is not None:
+            params["run"] = run
+        if task is not None:
+            params["task"] = task
         return AsyncPageIterator(
             lambda **p: self._http.get("/results", params=p),
             dict,
-            squid=squid,
-            page_size=page_size,
-            **kwargs,
+            **params,
         )
 
 
@@ -546,6 +609,9 @@ class AsyncLobstrClient:
         token: str | None = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
+        *,
+        user_agent: str | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         resolved = token or _resolve_token()
         if not resolved:
@@ -553,7 +619,9 @@ class AsyncLobstrClient:
                 "No API token found. Pass token= explicitly, set LOBSTR_TOKEN env var, "
                 "or run 'lobstr config set-token' to save one."
             )
-        self._http = _AsyncHTTPClient(resolved, base_url, timeout)
+        self._http = _AsyncHTTPClient(
+            resolved, base_url, timeout, user_agent=user_agent, transport=transport
+        )
         self.crawlers = AsyncCrawlersResource(self._http)
         self.squids = AsyncSquidsResource(self._http)
         self.tasks = AsyncTasksResource(self._http)
