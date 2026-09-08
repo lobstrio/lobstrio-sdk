@@ -8,7 +8,13 @@ from typing import Any
 
 import httpx
 
-from lobstrio._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, _raise_for_status, _resolve_token
+from lobstrio._base import (
+    DEFAULT_BASE_URL,
+    DEFAULT_TIMEOUT,
+    _build_user_agent,
+    _raise_for_status,
+    _resolve_token,
+)
 from lobstrio.exceptions import APIError, RunTimeout
 from lobstrio.models.account import Account, AccountType, SyncStatus
 from lobstrio.models.crawler import Crawler, CrawlerAttribute, CrawlerParams
@@ -37,9 +43,10 @@ class _AsyncHTTPClient:
         user_agent: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        headers = {"authorization": f"Token {token}"}
-        if user_agent:
-            headers["user-agent"] = user_agent
+        headers = {
+            "authorization": f"Token {token}",
+            "user-agent": _build_user_agent(user_agent),
+        }
         self._client = httpx.AsyncClient(
             base_url=base_url,
             headers=headers,

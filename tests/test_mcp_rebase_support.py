@@ -73,7 +73,17 @@ def test_user_agent_header_is_sent(httpx_mock):
     httpx_mock.add_response(json={"available": 5, "consumed": 1})
     c = LobstrClient(token="t", base_url="https://api.lobstr.io/v1/", user_agent="lobstr-mcp/9.9")
     c.balance()
+    # a caller-supplied user_agent is forwarded verbatim
     assert httpx_mock.get_requests()[0].headers["user-agent"] == "lobstr-mcp/9.9"
+
+
+def test_default_user_agent_identifies_the_sdk(httpx_mock):
+    from lobstrio._version import __version__
+    httpx_mock.add_response(json={"available": 5, "consumed": 1})
+    c = LobstrClient(token="t", base_url="https://api.lobstr.io/v1/")
+    c.balance()
+    # with no user_agent, the SDK identifies itself so the API can attribute it
+    assert httpx_mock.get_requests()[0].headers["user-agent"] == f"lobstrio-sdk/{__version__}"
 
 
 def test_transport_hook_is_used():
