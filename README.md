@@ -433,6 +433,24 @@ ruff check src/ tests/
 mypy src/lobstrio/
 ```
 
+## Releasing
+
+Publishing to PyPI is triggered by a **GitHub Release**, not by merging to `master`.
+Merging alone does **not** publish. To cut a release:
+
+1. Bump the version in `src/lobstrio/_version.py` (e.g. `0.4.1`).
+2. Add a matching entry to `CHANGELOG.md`.
+3. Merge to `master` (via PR; CI must be green).
+4. Create a GitHub Release tagged `vX.Y.Z` on `master`:
+   ```bash
+   gh release create v0.4.1 --target master --title "v0.4.1" --notes "…"
+   ```
+
+Creating the release fires `.github/workflows/publish.yml` (`on: release: published`),
+which builds with `uv` and publishes to PyPI using the `PYPI_TOKEN` repo secret.
+Confirm it went out: `pip index versions lobstrio-sdk` (or check the PyPI page).
+Note: a PyPI version cannot be overwritten — bump the version for every release.
+
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and versioning guidelines.
