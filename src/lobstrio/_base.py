@@ -6,10 +6,24 @@ from pathlib import Path
 
 import httpx
 
+from lobstrio._version import __version__
 from lobstrio.exceptions import APIError, AuthError, NotFoundError, RateLimitError
 
 DEFAULT_BASE_URL = "https://api.lobstr.io/v1/"
 DEFAULT_TIMEOUT = 30.0
+DEFAULT_USER_AGENT = f"lobstrio-sdk/{__version__}"
+
+
+def _build_user_agent(user_agent: str | None) -> str:
+    """Build the request User-Agent.
+
+    Defaults to ``lobstrio-sdk/<version>`` so the API can attribute requests (e.g.
+    it derives a squid's creation source from this header). A caller that supplies
+    its own ``user_agent`` — typically a downstream client such as an MCP server —
+    is sent verbatim: it owns its own identity, and the API classifies it on its
+    own terms.
+    """
+    return user_agent or DEFAULT_USER_AGENT
 
 
 def _get_config_path() -> Path:
