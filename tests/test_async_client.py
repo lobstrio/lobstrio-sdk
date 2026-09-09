@@ -90,6 +90,19 @@ async def test_async_tasks_add(async_client, httpx_mock):
 
 
 @pytest.mark.asyncio
+async def test_async_squids_estimate(async_client, httpx_mock):
+    import json as _json
+
+    httpx_mock.add_response(json={"total_credits": 300, "tasks": {"count": 8}})
+    est = await async_client.squids.estimate("sq1")
+    assert est["total_credits"] == 300
+    req = httpx_mock.get_requests()[0]
+    assert req.method == "POST"
+    assert req.url.path.endswith("/squid/estimate")
+    assert _json.loads(req.content) == {"squid": "sq1"}
+
+
+@pytest.mark.asyncio
 async def test_async_runs_start(async_client, httpx_mock):
     httpx_mock.add_response(json={"id": "r1", "status": "running", "total_results": 0, "duration": 0, "credit_used": 0})
     run = await async_client.runs.start(squid="sq1")
