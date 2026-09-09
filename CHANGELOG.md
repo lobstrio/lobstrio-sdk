@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-09
+
+### Added
+
+- `squids.estimate(squid_id)` (sync + async) — authoritative pre-run cost/result
+  estimate via `POST /squid/estimate`. Returns the API's real numbers (per-service
+  credit/result breakdown, `total_credits`, `estimated_time`, projected
+  `max_results`, `tasks` preview). The squid must exist with at least one task.
+
+- `squids.update(...)` gains the remaining documented `POST /squids/{id}` fields
+  (sync + async): `is_active`, `to_complete`, `no_line_breaks`, `cron_expression`,
+  `timezone`. Only the fields you pass are sent.
+
 ## [0.4.1] - 2026-09-08
 
 ### Added

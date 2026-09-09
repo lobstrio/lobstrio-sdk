@@ -247,6 +247,11 @@ class AsyncSquidsResource:
         run_notify: str | None = None,
         export_unique_results: bool | None = None,
         params: dict[str, Any] | None = None,
+        is_active: bool | None = None,
+        to_complete: int | None = None,
+        no_line_breaks: bool | None = None,
+        cron_expression: str | None = None,
+        timezone: str | None = None,
     ) -> Squid:
         body: dict[str, Any] = {}
         if concurrency is not None:
@@ -259,8 +264,27 @@ class AsyncSquidsResource:
             body["export_unique_results"] = export_unique_results
         if params is not None:
             body["params"] = params
+        if is_active is not None:
+            body["is_active"] = is_active
+        if to_complete is not None:
+            body["to_complete"] = to_complete
+        if no_line_breaks is not None:
+            body["no_line_breaks"] = no_line_breaks
+        if cron_expression is not None:
+            body["cron_expression"] = cron_expression
+        if timezone is not None:
+            body["timezone"] = timezone
         await self._http.post(f"/squids/{squid_id}", json=body)
         return await self.get(squid_id)
+
+    async def estimate(self, squid_id: str) -> dict[str, Any]:
+        """Authoritative pre-run cost/result estimate (``POST /squid/estimate``).
+
+        The squid must exist and have at least one task. Returns the API's
+        estimate: per-service credit/result breakdown, ``total_credits``,
+        ``estimated_time``, projected ``max_results``, and a ``tasks`` preview.
+        """
+        return await self._http.post("/squid/estimate", json={"squid": squid_id})
 
     async def empty(self, squid_id: str, *, type: str = "url") -> dict[str, Any]:
         return await self._http.post(f"/squids/{squid_id}/empty", json={"type": type})

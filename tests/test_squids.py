@@ -60,3 +60,49 @@ def test_squids_iter(client, httpx_mock):
     items = list(client.squids.iter())
     assert len(items) == 1
     assert items[0].id == "sq1"
+
+
+ESTIMATE_DATA = {
+    "services": [{"name": "Google Maps data", "results": 300, "credits": 300}],
+    "total_credits": 300,
+    "estimated_time": "5 mins - 12 mins",
+    "recommended_upgrade_plan": None,
+    "max_results": 800,
+    "tasks": {"count": 8, "preview": []},
+}
+
+
+def test_squids_estimate(client, httpx_mock):
+    import json as _json
+
+    httpx_mock.add_response(json=ESTIMATE_DATA)
+    est = client.squids.estimate("sq1")
+    assert est["total_credits"] == 300
+    assert est["tasks"]["count"] == 8
+    req = httpx_mock.get_requests()[0]
+    assert req.method == "POST"
+    assert req.url.path.endswith("/squid/estimate")
+    assert _json.loads(req.content) == {"squid": "sq1"}
+
+
+def test_squids_update_new_fields(client, httpx_mock):
+    import json as _json
+
+    httpx_mock.add_response(json={"name": "My Scraper"})  # POST (update)
+    httpx_mock.add_response(json=SQUID_DATA)  # GET (re-fetch)
+    client.squids.update(
+        "sq1",
+        is_active=False,
+        to_complete=50,
+        no_line_breaks=True,
+        cron_expression="0 9 * * 1",
+        timezone="Europe/Paris",
+    )
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert body == {
+        "is_active": False,
+        "to_complete": 50,
+        "no_line_breaks": True,
+        "cron_expression": "0 9 * * 1",
+        "timezone": "Europe/Paris",
+    }
