@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-10
+
+### Added
+
+- `accounts.iter()` (sync + async) — iterate every connected account across
+  pages, matching the `iter()` already available on crawlers, squids, tasks,
+  runs, and results. `accounts.list()` returns only a single page (50 by
+  default), so resolving an account by username silently missed anything past
+  the first page.
+
 ## [0.5.0] - 2026-09-09
 
 ### Added

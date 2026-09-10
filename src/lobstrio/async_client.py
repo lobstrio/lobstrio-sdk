@@ -513,6 +513,14 @@ class AsyncAccountsResource:
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Account.from_api(a) for a in items]
 
+    def iter(self, *, limit: int = 50, **kwargs: Any) -> AsyncPageIterator:
+        return AsyncPageIterator(
+            lambda **p: self._http.get("/accounts", params=p),
+            Account,
+            limit=limit,
+            **kwargs,
+        )
+
     async def get(self, account_id: str) -> Account:
         data = await self._http.get(f"/accounts/{account_id}")
         if isinstance(data, dict) and "data" in data:
