@@ -159,3 +159,18 @@ async def test_async_context_manager(httpx_mock):
     async with AsyncLobstrClient(token="t") as client:
         user = await client.me()
         assert user.email == "t@t.com"
+
+
+@pytest.mark.asyncio
+async def test_async_accounts_iter_walks_all_pages(async_client, httpx_mock):
+    """Async iter() must keep paging past the first page (the 50-item cap)."""
+    base = {"id": "ac1", "username": "user@example.com", "type": "linkedin"}
+    page1 = [dict(base, id=f"a{i}") for i in range(50)]
+    page2 = [dict(base, id=f"b{i}") for i in range(12)]
+    httpx_mock.add_response(json={"data": page1, "total_pages": 2, "page": 1})
+    httpx_mock.add_response(json={"data": page2, "total_pages": 2, "page": 2})
+
+    items = [a async for a in async_client.accounts.iter()]
+
+    assert len(items) == 62
+    assert items[-1].id == "b11"

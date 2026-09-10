@@ -481,10 +481,19 @@ class AccountsResource:
         self._http = http
 
     def list(self, *, limit: int = 50, page: int = 1) -> list[Account]:
-        """List connected platform accounts."""
+        """List connected platform accounts (single page)."""
         data = self._http.get("/accounts", params={"limit": limit, "page": page})
         items = data.get("data", data) if isinstance(data, dict) else data
         return [Account.from_api(a) for a in items]
+
+    def iter(self, *, limit: int = 50, **kwargs: Any) -> PageIterator[Account]:
+        """Iterate all connected accounts across pages."""
+        return PageIterator(
+            lambda **p: self._http.get("/accounts", params=p),
+            Account,
+            limit=limit,
+            **kwargs,
+        )
 
     def get(self, account_id: str) -> Account:
         """Get account details."""
