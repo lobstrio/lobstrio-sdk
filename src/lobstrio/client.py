@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -188,6 +188,7 @@ class SquidsResource:
         no_line_breaks: bool | None = None,
         cron_expression: str | None = None,
         timezone: str | None = None,
+        accounts: list[str] | None = None,
     ) -> Squid:
         """Update squid settings via ``POST /squids/{id}``.
 
@@ -195,6 +196,14 @@ class SquidsResource:
         its concurrency slot); ``cron_expression`` + ``timezone`` schedule it;
         ``no_line_breaks`` strips newlines from exported cells; ``to_complete``
         sets the number of tasks queued to run. Only the fields you pass are sent.
+
+        ``accounts`` is a list of account hashes (``Account.id``) to link. **The
+        API field is full-replace**: whatever you send here becomes the squid's
+        *entire* account list, and any account not listed is detached. As with
+        every other field, ``None`` (the default) means "don't touch accounts
+        at all"; passing ``accounts=[]`` explicitly detaches everything. Most
+        callers that want to add an account without dropping the others should
+        use :meth:`attach_accounts` instead, which reads the current list first.
         """
         body: dict[str, Any] = {}
         if concurrency is not None:
@@ -217,8 +226,56 @@ class SquidsResource:
             body["cron_expression"] = cron_expression
         if timezone is not None:
             body["timezone"] = timezone
+        if accounts is not None:
+            body["accounts"] = accounts
         self._http.post(f"/squids/{squid_id}", json=body)
         return self.get(squid_id)
+
+    def attach_accounts(
+        self, squid_id: str, accounts: Sequence[str], *, replace: bool = False
+    ) -> Squid:
+        """Link account(s) to a squid without silently dropping the others.
+
+        ``POST /squids/{id}`` with an ``accounts`` body is a **full-replace**
+        field on the API side: it deletes every existing link before writing
+        the new list. A naive ``squids.update(squid_id, accounts=[...])`` call
+        therefore detaches whatever was already attached.
+
+        By default (``replace=False``) this method fetches the squid's current
+        ``accounts``, merges in the hashes you pass (de-duplicated), and sends
+        the union — the safe "add" behaviour most callers want. Pass
+        ``replace=True`` to send exactly the list you give (including ``[]``
+        to detach everything), when you really mean "make this the whole set".
+        The read and the write are two separate requests, not an atomic
+        compare-and-set — the API offers no such primitive — so a concurrent
+        attach on the same squid between them can still race and drop one
+        addition.
+
+        Raises :class:`~lobstrio.exceptions.NotFoundError` if any hash does not
+        belong to you or its account type does not match the squid's crawler
+        (the API returns the same 404 for both — check the account's ``type``
+        against the crawler's ``account_type`` before calling this if you want
+        to tell those apart). Raises :class:`~lobstrio.exceptions.APIError` if
+        the crawler needs no account at all.
+        """
+        if not replace:
+            current = self.get(squid_id)
+            # `current.accounts` is untyped API JSON (`list[dict[str, Any]]`);
+            # narrow explicitly to the string ids it should hold rather than
+            # trusting the shape. An entry missing/mistyping "id" is dropped,
+            # not crashed on and not silently treated as "no existing
+            # accounts" — the surrounding ids that *do* parse are kept, so a
+            # malformed entry can only ever narrow what's added, never wipe
+            # what's already attached (the full-replace failure mode this
+            # method exists to prevent).
+            existing_ids: list[str] = [
+                a["id"] for a in current.accounts if isinstance(a.get("id"), str)
+            ]
+            new_ids = [a for a in accounts if a not in existing_ids]
+            merged: list[str] = existing_ids + new_ids
+        else:
+            merged = list(accounts)
+        return self.update(squid_id, accounts=merged)
 
     def estimate(self, squid_id: str) -> dict[str, Any]:
         """Authoritative pre-run cost/result estimate for a squid.

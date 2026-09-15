@@ -8,7 +8,7 @@ def _resolve_credits(value: Any) -> float | None:
     """Normalize credits fields that can be int, float, dict, or None."""
     if value is None:
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, dict):
         v = value.get("current", value.get("legacy"))
@@ -29,6 +29,15 @@ class Crawler:
     max_concurrency: int
     account: bool
     has_email_verification: bool
+    # `account` above is kept as a plain bool for backward compatibility — code
+    # already checking `if crawler.account:` must not break. It cannot carry the
+    # platform though: `linkedin-sync` and `sales-nav-sync` are both "LinkedIn"
+    # to a human but distinct account types to the API, and attaching the wrong
+    # one fails as a generic 404 (`AccountDoesNotExist` rewritten to
+    # `HTTPNotFound`, indistinguishable from a bad hash). `account_type` is the
+    # slug from ``account.type`` in the API response (`None` when the crawler
+    # needs no account) — added here alongside `account` rather than replacing
+    # it, so this widening cannot break an existing truthy/falsy check.
     is_public: bool
     is_premium: bool
     is_available: bool
@@ -39,6 +48,7 @@ class Crawler:
     email_worker_stats: dict[str, Any] | None = None
     input_params: list[dict[str, Any]] = field(default_factory=list)
     result_fields: list[str] = field(default_factory=list)
+    account_type: str | None = None
     # Untouched API payload, so callers that need a field the dataclass drops or
     # renames (e.g. the raw credits dict, or `result`/`input` under their API keys)
     # can still reach it.
@@ -66,6 +76,11 @@ class Crawler:
             email_worker_stats=data.get("email_worker_stats"),
             input_params=data.get("input", []),
             result_fields=data.get("result", []),
+            account_type=(
+                data["account"].get("type")
+                if isinstance(data.get("account"), dict)
+                else None
+            ),
         )
 
 

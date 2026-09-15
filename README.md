@@ -102,9 +102,16 @@ crawlers = client.crawlers.list()              # All crawlers
 crawler = client.crawlers.get("crawler-id")    # Single crawler
 params = client.crawlers.params("crawler-id")  # Parameter schema
 attrs = client.crawlers.attributes("crawler-id")  # Result columns
+
+# Does this crawler need an account, and which type?
+if crawler.account_type:
+    print(f"Needs a {crawler.account_type} account")  # e.g. "sales-nav-sync"
 ```
 
-**Models:** `Crawler`, `CrawlerAttribute`, `CrawlerParams`
+**Models:** `Crawler` (includes `account: bool` and `account_type: str | None`
+— two LinkedIn crawlers can need different account types, e.g. `linkedin-sync`
+vs `sales-nav-sync`, so match on `account_type`, not on the crawler's name),
+`CrawlerAttribute`, `CrawlerParams`
 
 </details>
 
@@ -124,9 +131,17 @@ squid = client.squids.update("squid-id", name="Renamed", concurrency=2,
                               params={"language": "English"})
 client.squids.empty("squid-id")        # remove all tasks
 client.squids.delete("squid-id")
+
+# Link an account-backed crawler's squid to an account
+# `accounts` on update() is full-replace on the API side (it detaches
+# anything not in the list you send). attach_accounts() reads the squid's
+# current accounts first and merges, so it never silently drops one:
+squid = client.squids.attach_accounts("squid-id", ["account-hash"])
+# Pass replace=True to send exactly the given list (e.g. [] to detach all):
+client.squids.attach_accounts("squid-id", [], replace=True)
 ```
 
-**Model:** `Squid` (id, name, crawler, is_active, concurrency, params, created_at, ...)
+**Model:** `Squid` (id, name, crawler, is_active, concurrency, params, accounts, created_at, ...)
 
 </details>
 
@@ -244,7 +259,12 @@ client.accounts.update("account-id", type="google", params={"daily_limit": 100})
 client.accounts.delete("account-id")
 ```
 
-**Models:** `Account`, `AccountType`, `SyncStatus`
+To link an account to a squid, see `client.squids.attach_accounts()` above —
+there is no attach call on `AccountsResource` itself; the API only accepts
+`accounts` on `POST /squids/{id}`.
+
+**Models:** `Account` (id, username, type, status, status_code_info,
+resets_in, lock_time, squids, ...), `AccountType`, `SyncStatus`
 
 </details>
 

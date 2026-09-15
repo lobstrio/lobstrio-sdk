@@ -21,6 +21,12 @@ class Squid:
     total_runs: int
     export_unique_results: bool
     params: dict[str, Any]
+    # The accounts linked to this squid, as the API returns them:
+    # ``[{"id": <account hash>, "status": <status_code_info>}, ...]``, or ``[]``
+    # when none are attached (the API forces this field to ``[]`` rather than
+    # omitting it whenever the crawler needs an account — see
+    # ``squids.attach_accounts()``). Empty for account-less crawlers too.
+    accounts: list[dict[str, Any]] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -40,4 +46,5 @@ class Squid:
             total_runs=data.get("total_runs", 0),
             export_unique_results=data.get("export_unique_results", False),
             params=data.get("params", {}),
+            accounts=data.get("accounts") or [],
         )

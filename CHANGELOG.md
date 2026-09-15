@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-15
+
+### Added
+
+- `squids.update(...)` gains `accounts` (sync + async): a list of account
+  hashes to link, matching `POST /squids/{id}`. **The API field is
+  full-replace** — sending `accounts` deletes every existing link first, so
+  a naive call detaches whatever was already attached. `accounts=None` (the
+  default, like every other `update()` field) leaves accounts untouched.
+- `squids.attach_accounts(squid_id, accounts, *, replace=False)` (sync +
+  async): the safe entry point for linking an account without dropping the
+  others. By default it reads the squid's current `accounts` first and sends
+  the union (de-duplicated); `replace=True` sends exactly the given list,
+  including `[]` to detach everything. Added alongside `update(accounts=...)`
+  rather than instead of it: `update()` stays a thin, literal mirror of the
+  API body for callers that already track the full desired list (or want to
+  detach deliberately), while `attach_accounts()` is what a client reaches
+  for by default, so the read-merge-write dance for "add one account" isn't
+  duplicated in every downstream caller (CLI, MCP). The read and the write
+  are two separate requests, not an atomic compare-and-set — the API offers
+  no such primitive — so a concurrent attach on the same squid between them
+  can still race and drop one addition.
+- `Squid.accounts`: the squid's linked accounts as the API returns them
+  (`[{"id": <account hash>, "status": <status_code_info>}, ...]`), previously
+  reachable only via `.raw["accounts"]`.
+- `Account.status`, `Account.resets_in`, `Account.lock_time`: the fields a
+  client needs to auto-pick a healthy, unlocked account — `status == "200"`
+  is what a run actually needs an attached account to be before it can use
+  it; `resets_in`/`lock_time` show whether the account is currently locked
+  by a run on another squid. Previously dropped by `Account.from_api`.
+- `Crawler.account_type`: the account type slug a crawler needs (e.g.
+  `linkedin-sync`, `sales-nav-sync`), or `None` if it needs no account.
+  Added alongside the existing `Crawler.account: bool`, which is unchanged,
+  so nothing that already checks `if crawler.account:` breaks. Two LinkedIn
+  crawlers can need two different account types; matching on this slug
+  (not on the crawler's name) is what makes auto-pick safe — see
+  `attach_accounts()` above.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added
