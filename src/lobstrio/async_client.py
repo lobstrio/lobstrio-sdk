@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -286,7 +286,7 @@ class AsyncSquidsResource:
         return await self.get(squid_id)
 
     async def attach_accounts(
-        self, squid_id: str, accounts: list[str], *, replace: bool = False
+        self, squid_id: str, accounts: Sequence[str], *, replace: bool = False
     ) -> Squid:
         """See ``SquidsResource.attach_accounts`` (sync client) for full docs.
 
@@ -296,9 +296,22 @@ class AsyncSquidsResource:
         """
         if not replace:
             current = await self.get(squid_id)
-            existing_ids = [a["id"] for a in current.accounts]
-            accounts = existing_ids + [a for a in accounts if a not in existing_ids]
-        return await self.update(squid_id, accounts=accounts)
+            # `current.accounts` is untyped API JSON (`list[dict[str, Any]]`);
+            # narrow explicitly to the string ids it should hold rather than
+            # trusting the shape. An entry missing/mistyping "id" is dropped,
+            # not crashed on and not silently treated as "no existing
+            # accounts" — the surrounding ids that *do* parse are kept, so a
+            # malformed entry can only ever narrow what's added, never wipe
+            # what's already attached (the full-replace failure mode this
+            # method exists to prevent).
+            existing_ids: list[str] = [
+                a["id"] for a in current.accounts if isinstance(a.get("id"), str)
+            ]
+            new_ids = [a for a in accounts if a not in existing_ids]
+            merged: list[str] = existing_ids + new_ids
+        else:
+            merged = list(accounts)
+        return await self.update(squid_id, accounts=merged)
 
     async def estimate(self, squid_id: str) -> dict[str, Any]:
         """Authoritative pre-run cost/result estimate (``POST /squid/estimate``).

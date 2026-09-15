@@ -8,7 +8,7 @@ def _resolve_credits(value: Any) -> float | None:
     """Normalize credits fields that can be int, float, dict, or None."""
     if value is None:
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, dict):
         v = value.get("current", value.get("legacy"))
