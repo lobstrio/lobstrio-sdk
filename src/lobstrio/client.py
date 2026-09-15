@@ -246,6 +246,10 @@ class SquidsResource:
         the union — the safe "add" behaviour most callers want. Pass
         ``replace=True`` to send exactly the list you give (including ``[]``
         to detach everything), when you really mean "make this the whole set".
+        The read and the write are two separate requests, not an atomic
+        compare-and-set — the API offers no such primitive — so a concurrent
+        attach on the same squid between them can still race and drop one
+        addition.
 
         Raises :class:`~lobstrio.exceptions.NotFoundError` if any hash does not
         belong to you or its account type does not match the squid's crawler

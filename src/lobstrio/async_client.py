@@ -288,7 +288,12 @@ class AsyncSquidsResource:
     async def attach_accounts(
         self, squid_id: str, accounts: list[str], *, replace: bool = False
     ) -> Squid:
-        """See ``SquidsResource.attach_accounts`` (sync client) for full docs."""
+        """See ``SquidsResource.attach_accounts`` (sync client) for full docs.
+
+        The read and the write are two separate requests, not an atomic
+        compare-and-set — a concurrent attach on the same squid between them
+        can still race and drop one addition.
+        """
         if not replace:
             current = await self.get(squid_id)
             existing_ids = [a["id"] for a in current.accounts]

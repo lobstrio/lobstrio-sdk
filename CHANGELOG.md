@@ -23,7 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API body for callers that already track the full desired list (or want to
   detach deliberately), while `attach_accounts()` is what a client reaches
   for by default, so the read-merge-write dance for "add one account" isn't
-  duplicated in every downstream caller (CLI, MCP).
+  duplicated in every downstream caller (CLI, MCP). The read and the write
+  are two separate requests, not an atomic compare-and-set — the API offers
+  no such primitive — so a concurrent attach on the same squid between them
+  can still race and drop one addition.
 - `Squid.accounts`: the squid's linked accounts as the API returns them
   (`[{"id": <account hash>, "status": <status_code_info>}, ...]`), previously
   reachable only via `.raw["accounts"]`.
