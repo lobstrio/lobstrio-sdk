@@ -85,6 +85,79 @@ def test_squids_estimate(client, httpx_mock):
     assert _json.loads(req.content) == {"squid": "sq1"}
 
 
+def test_squids_update_accounts_field(client, httpx_mock):
+    """`accounts` is sent verbatim when passed to update() directly — this is
+    the raw, full-replace API field, not the safe merge helper."""
+    import json as _json
+
+    httpx_mock.add_response(json={"accounts": ["ac1"]})  # POST (update)
+    httpx_mock.add_response(json={**SQUID_DATA, "accounts": [{"id": "ac1", "status": "ok"}]})  # GET
+    s = client.squids.update("sq1", accounts=["ac1"])
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert body == {"accounts": ["ac1"]}
+    assert s.accounts == [{"id": "ac1", "status": "ok"}]
+
+
+def test_squids_update_omits_accounts_by_default(client, httpx_mock):
+    """`accounts=None` (the default) must never appear in the body — sending
+    an empty/absent `accounts` key would detach everything on the API side."""
+    import json as _json
+
+    httpx_mock.add_response(json={"name": "My Scraper"})
+    httpx_mock.add_response(json=SQUID_DATA)
+    client.squids.update("sq1", name="My Scraper")
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert "accounts" not in body
+
+
+def test_attach_accounts_merges_with_existing_by_default(client, httpx_mock):
+    """The API's `accounts` field is full-replace. attach_accounts() must read
+    the current list first and send the union, not just the new hash."""
+    import json as _json
+
+    existing = {**SQUID_DATA, "accounts": [{"id": "ac_old", "status": "ok"}]}
+    httpx_mock.add_response(json=existing)  # GET (read current)
+    httpx_mock.add_response(json={"accounts": ["ac_old", "ac_new"]})  # POST (update)
+    httpx_mock.add_response(json={**SQUID_DATA, "accounts": [
+        {"id": "ac_old", "status": "ok"}, {"id": "ac_new", "status": "ok"},
+    ]})  # GET (re-fetch)
+
+    s = client.squids.attach_accounts("sq1", ["ac_new"])
+
+    body = _json.loads(httpx_mock.get_requests()[1].content)
+    assert body == {"accounts": ["ac_old", "ac_new"]}
+    assert {a["id"] for a in s.accounts} == {"ac_old", "ac_new"}
+
+
+def test_attach_accounts_dedupes_already_attached(client, httpx_mock):
+    import json as _json
+
+    existing = {**SQUID_DATA, "accounts": [{"id": "ac1", "status": "ok"}]}
+    httpx_mock.add_response(json=existing)  # GET (read current)
+    httpx_mock.add_response(json={"accounts": ["ac1"]})  # POST (update)
+    httpx_mock.add_response(json=existing)  # GET (re-fetch)
+
+    client.squids.attach_accounts("sq1", ["ac1"])
+
+    body = _json.loads(httpx_mock.get_requests()[1].content)
+    assert body == {"accounts": ["ac1"]}
+
+
+def test_attach_accounts_replace_true_skips_the_read(client, httpx_mock):
+    """`replace=True` sends exactly the given list — no GET first, and it can
+    detach (e.g. `accounts=[]`)."""
+    import json as _json
+
+    httpx_mock.add_response(json={"accounts": []})  # POST (update)
+    httpx_mock.add_response(json={**SQUID_DATA, "accounts": []})  # GET (re-fetch)
+
+    client.squids.attach_accounts("sq1", [], replace=True)
+
+    assert len(httpx_mock.get_requests()) == 2  # no extra GET before the POST
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert body == {"accounts": []}
+
+
 def test_squids_update_new_fields(client, httpx_mock):
     import json as _json
 

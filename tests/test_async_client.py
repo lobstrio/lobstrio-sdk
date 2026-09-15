@@ -103,6 +103,58 @@ async def test_async_squids_estimate(async_client, httpx_mock):
 
 
 @pytest.mark.asyncio
+async def test_async_squids_update_omits_accounts_by_default(async_client, httpx_mock):
+    import json as _json
+
+    httpx_mock.add_response(json={"name": "Renamed"})  # POST
+    httpx_mock.add_response(
+        json={"id": "sq1", "name": "Renamed", "crawler": "c1", "crawler_name": "Test",
+              "is_active": True, "params": {}}
+    )  # GET
+    await async_client.squids.update("sq1", name="Renamed")
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert "accounts" not in body
+
+
+@pytest.mark.asyncio
+async def test_async_attach_accounts_merges_with_existing(async_client, httpx_mock):
+    import json as _json
+
+    existing = {
+        "id": "sq1", "name": "Test", "crawler": "c1", "crawler_name": "Test",
+        "is_active": True, "params": {}, "accounts": [{"id": "ac_old", "status": "ok"}],
+    }
+    httpx_mock.add_response(json=existing)  # GET (read current)
+    httpx_mock.add_response(json={"accounts": ["ac_old", "ac_new"]})  # POST (update)
+    httpx_mock.add_response(json={**existing, "accounts": [
+        {"id": "ac_old", "status": "ok"}, {"id": "ac_new", "status": "ok"},
+    ]})  # GET (re-fetch)
+
+    s = await async_client.squids.attach_accounts("sq1", ["ac_new"])
+
+    body = _json.loads(httpx_mock.get_requests()[1].content)
+    assert body == {"accounts": ["ac_old", "ac_new"]}
+    assert {a["id"] for a in s.accounts} == {"ac_old", "ac_new"}
+
+
+@pytest.mark.asyncio
+async def test_async_attach_accounts_replace_skips_read(async_client, httpx_mock):
+    import json as _json
+
+    httpx_mock.add_response(json={"accounts": ["ac_new"]})  # POST (update)
+    httpx_mock.add_response(
+        json={"id": "sq1", "name": "Test", "crawler": "c1", "crawler_name": "Test",
+              "is_active": True, "params": {}, "accounts": [{"id": "ac_new", "status": "ok"}]}
+    )  # GET (re-fetch)
+
+    await async_client.squids.attach_accounts("sq1", ["ac_new"], replace=True)
+
+    assert len(httpx_mock.get_requests()) == 2
+    body = _json.loads(httpx_mock.get_requests()[0].content)
+    assert body == {"accounts": ["ac_new"]}
+
+
+@pytest.mark.asyncio
 async def test_async_runs_start(async_client, httpx_mock):
     httpx_mock.add_response(json={"id": "r1", "status": "running", "total_results": 0, "duration": 0, "credit_used": 0})
     run = await async_client.runs.start(squid="sq1")

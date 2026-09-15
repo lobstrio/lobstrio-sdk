@@ -57,6 +57,22 @@ class TestCrawler:
         assert c.credits_per_row is None
         assert c.max_concurrency == 1
 
+    def test_account_type_slug(self):
+        """`account` stays a bool (back-compat); `account_type` carries the slug
+        a client needs to pick a matching account — "LinkedIn" is not one
+        platform (linkedin-sync vs sales-nav-sync)."""
+        c = Crawler.from_api({
+            "id": "x",
+            "account": {"type": "sales-nav-sync", "baseurl": "...", "cookies": [], "icon": ""},
+        })
+        assert c.account is True
+        assert c.account_type == "sales-nav-sync"
+
+    def test_account_type_none_when_not_account_backed(self):
+        c = Crawler.from_api({"id": "x", "account": None})
+        assert c.account is False
+        assert c.account_type is None
+
 
 class TestCrawlerParams:
     def test_from_api_with_functions(self):
@@ -117,6 +133,17 @@ class TestSquid:
         assert s.id == "sq1"
         assert s.concurrency == 3
         assert s.params["max_results"] == 100
+        assert s.accounts == []
+
+    def test_from_api_with_accounts(self):
+        data = {"id": "sq1", "accounts": [{"id": "ac1", "status": "ok"}]}
+        s = Squid.from_api(data)
+        assert s.accounts == [{"id": "ac1", "status": "ok"}]
+
+    def test_from_api_accounts_null(self):
+        """The API sends `accounts: null` after a full detach, not `[]`."""
+        s = Squid.from_api({"id": "sq1", "accounts": None})
+        assert s.accounts == []
 
 
 class TestTask:

@@ -252,7 +252,13 @@ class AsyncSquidsResource:
         no_line_breaks: bool | None = None,
         cron_expression: str | None = None,
         timezone: str | None = None,
+        accounts: list[str] | None = None,
     ) -> Squid:
+        """See ``SquidsResource.update`` (sync client) for full docs.
+
+        ``accounts`` is full-replace on the API side; prefer
+        :meth:`attach_accounts` to add without detaching what is already there.
+        """
         body: dict[str, Any] = {}
         if concurrency is not None:
             body["concurrency"] = concurrency
@@ -274,8 +280,20 @@ class AsyncSquidsResource:
             body["cron_expression"] = cron_expression
         if timezone is not None:
             body["timezone"] = timezone
+        if accounts is not None:
+            body["accounts"] = accounts
         await self._http.post(f"/squids/{squid_id}", json=body)
         return await self.get(squid_id)
+
+    async def attach_accounts(
+        self, squid_id: str, accounts: list[str], *, replace: bool = False
+    ) -> Squid:
+        """See ``SquidsResource.attach_accounts`` (sync client) for full docs."""
+        if not replace:
+            current = await self.get(squid_id)
+            existing_ids = [a["id"] for a in current.accounts]
+            accounts = existing_ids + [a for a in accounts if a not in existing_ids]
+        return await self.update(squid_id, accounts=accounts)
 
     async def estimate(self, squid_id: str) -> dict[str, Any]:
         """Authoritative pre-run cost/result estimate (``POST /squid/estimate``).

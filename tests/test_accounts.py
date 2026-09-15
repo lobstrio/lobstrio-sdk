@@ -1,5 +1,7 @@
 """Tests for the accounts resource."""
 
+from lobstrio.models.account import Account
+
 ACCOUNT_DATA = {
     "id": "ac1",
     "username": "user@example.com",
@@ -34,3 +36,27 @@ def test_accounts_iter_walks_all_pages(client, httpx_mock):
     assert len(items) == 62
     assert len({a.id for a in items}) == 62
     assert items[-1].id == "b11"
+
+
+def test_account_status_and_lock_fields():
+    """These are what auto-pick relies on: `status == "200"` is the worker's
+    own healthy condition (matrix/worker/consumer.py), `resets_in` is non-zero
+    while an account is mid-lock on another squid."""
+    a = Account.from_api({
+        "id": "ac1",
+        "username": "user@example.com",
+        "type": "sales-nav-sync",
+        "status": "200",
+        "resets_in": 0,
+        "lock_time": None,
+    })
+    assert a.status == "200"
+    assert a.resets_in == 0
+    assert a.lock_time is None
+
+
+def test_account_status_fields_default_none():
+    a = Account.from_api({"id": "ac1"})
+    assert a.status is None
+    assert a.resets_in is None
+    assert a.lock_time is None

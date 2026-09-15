@@ -19,6 +19,15 @@ class Account:
     last_synchronization_time: str | None
     squids: list[dict[str, Any]]
     params: dict[str, Any]
+    # Added for account-attach auto-pick (see squids.attach_accounts()): `status`
+    # is the API's raw status code as a string (e.g. "200" = healthy) — the exact
+    # condition the run worker uses to decide whether an attached account is
+    # usable. `resets_in`/`lock_time` surface whether the account is mid-run on
+    # another squid (`params.lock_time` server-side) so a client can avoid
+    # picking a busy account. All three are additive; nothing above changed.
+    status: str | None = None
+    resets_in: int | None = None
+    lock_time: str | None = None
 
     @classmethod
     def from_api(cls, data: dict[str, Any]) -> Account:
@@ -34,6 +43,9 @@ class Account:
             last_synchronization_time=data.get("last_synchronization_time"),
             squids=data.get("squids", []),
             params=data.get("params", {}),
+            status=data.get("status"),
+            resets_in=data.get("resets_in"),
+            lock_time=data.get("lock_time"),
         )
 
 
