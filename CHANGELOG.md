@@ -31,11 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`[{"id": <account hash>, "status": <status_code_info>}, ...]`), previously
   reachable only via `.raw["accounts"]`.
 - `Account.status`, `Account.resets_in`, `Account.lock_time`: the fields a
-  client needs to auto-pick a healthy, unlocked account —
-  `status == "200"` is the exact condition the run worker itself checks
-  before accepting an attached account (`matrix/worker/consumer.py`);
-  `resets_in`/`lock_time` show whether the account is currently locked by a
-  run on another squid. Previously dropped by `Account.from_api`.
+  client needs to auto-pick a healthy, unlocked account — `status == "200"`
+  is what a run actually needs an attached account to be before it can use
+  it; `resets_in`/`lock_time` show whether the account is currently locked
+  by a run on another squid. Previously dropped by `Account.from_api`.
 - `Crawler.account_type`: the account type slug a crawler needs (e.g.
   `linkedin-sync`, `sales-nav-sync`), or `None` if it needs no account.
   Added alongside the existing `Crawler.account: bool`, which is unchanged,
