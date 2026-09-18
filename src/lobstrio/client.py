@@ -192,8 +192,10 @@ class SquidsResource:
     ) -> Squid:
         """Update squid settings via ``POST /squids/{id}``.
 
-        ``is_active`` activates/deactivates the squid (a deactivated squid frees
-        its concurrency slot); ``cron_expression`` + ``timezone`` schedule it;
+        ``is_active`` activates/deactivates the squid (deactivating stops any run
+        in progress and takes it out of its schedule; it frees no plan capacity,
+        which is metered per simultaneous run, not per squid);
+        ``cron_expression`` + ``timezone`` schedule it;
         ``no_line_breaks`` strips newlines from exported cells; ``to_complete``
         sets the number of tasks queued to run. Only the fields you pass are sent.
 

@@ -27,7 +27,12 @@ class User:
 
 @dataclass
 class Balance:
-    """Account credit balance."""
+    """Account credit balance and run concurrency.
+
+    ``used_slots`` / ``total_available_slots`` count runs, not squids: how many
+    are executing right now against how many the plan allows at once. Creating
+    squids is unlimited and does not count against it.
+    """
 
     available: int
     consumed: int
